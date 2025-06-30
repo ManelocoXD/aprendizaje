@@ -18,27 +18,28 @@
             <li><a href="mostrar-reservas.html">Reservas</a></li>
         </ul>
     </nav>
-  <script>
-    const form = document.getElementById('formulario');
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const datos = Object.fromEntries(new FormData(form));
+<script>
+  const form = document.getElementById('formulario');
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const datos = Object.fromEntries(new FormData(form));
 
-      fetch('http://localhost:3000/reservar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(datos)
-      })
-      .then(res => res.text())
-      .then(msg => {
-        alert(msg);
-        form.reset();
-      })
-      .catch(err => {
-        alert('Error al enviar reserva');
-        console.error(err);
-      });
+    fetch('https://aprendizaje-q0q8.onrender.com/reservar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(datos)
+    })
+    .then(res => res.text())
+    .then(msg => {
+      alert(msg);
+      form.reset();
+    })
+    .catch(err => {
+      alert('Error al enviar reserva');
+      console.error(err);
     });
-  </script>
+  });
+</script>
+
 </body>
 </html>
