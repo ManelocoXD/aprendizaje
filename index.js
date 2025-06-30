@@ -60,3 +60,8 @@ app.get('/reservas', (req, res) => {
 app.listen(3000, () => {
   console.log('Servidor escuchando en https://aprendizaje-q0q8.onrender.com/reservar');
 });
+
+app.get('/api/reservas', async (req, res) => {
+  const [filas] = await conexion.query('SELECT * FROM reservas ORDER BY fecha, hora');
+  res.json(filas);
+});
