@@ -9,7 +9,7 @@
   <ul id="lista-reservas"></ul>
 
   <script>
-    fetch('https://aprendizaje-q0q8.onrender.com/reservar')
+fetch('https://aprendizaje-q0q8.onrender.com/api/reservas')
       .then(res => res.json())
       .then(data => {
         const lista = document.getElementById('lista-reservas');
