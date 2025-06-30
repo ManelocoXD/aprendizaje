@@ -32,6 +32,15 @@ app.post('/reservar', (req, res) => {
   if (!nombre || !personas || !hora || !fecha) {
     return res.status(400).send('Faltan datos obligatorios');
   }
+app.get('/api/reservas', async (req, res) => {
+  try {
+    const [filas] = await conexion.query('SELECT * FROM reservas ORDER BY fecha, hora');
+    res.json(filas);
+  } catch (error) {
+    console.error('Error al obtener reservas:', error);
+    res.status(500).send('Error del servidor');
+  }
+});
 
   db.query(
     'INSERT INTO reservas (nombre, personas, hora, fecha) VALUES (?, ?, ?, ?)',
@@ -61,7 +70,3 @@ app.listen(3000, () => {
   console.log('Servidor escuchando en https://aprendizaje-q0q8.onrender.com/reservar');
 });
 
-app.get('/api/reservas', async (req, res) => {
-  const [filas] = await conexion.query('SELECT * FROM reservas ORDER BY fecha, hora');
-  res.json(filas);
-});
