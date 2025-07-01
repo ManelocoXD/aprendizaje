@@ -11,11 +11,11 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Conexión a la base de datos
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+const db = mysql.createConnection({
+  host: 'btbn32pgv8nw8oj4llq0-mysql.services.clever-cloud.com',
+  user: 'ulvkzoepxs27anjn',
+  password: 'qR7tInn5sq9IFrWBjB9H',       // Cambia si tienes otra contraseña
+  database: 'btbn32pgv8nw8oj4llq0' // Asegúrate que esta base existe y tiene tabla reservas
 });
 
 db.connect(err => {
