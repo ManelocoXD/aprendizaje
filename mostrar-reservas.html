@@ -1,30 +1,38 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
   <meta charset="UTF-8" />
   <title>Mostrar Reservas</title>
 </head>
 <body>
   <h1>Lista de reservas</h1>
+  <button onclick="cargarReservas()">Actualizar manualmente</button>
   <ul id="lista-reservas"></ul>
 
   <script>
-    fetch('/api/reservas') // ← Llama a la función serverless en Vercel
-      .then(res => res.json())
-      .then(data => {
-        const lista = document.getElementById('lista-reservas');
-        lista.innerHTML = ''; // limpia antes de añadir por si se recarga
-        data.forEach(reserva => {
-          const li = document.createElement('li');
-          li.textContent = `${reserva.nombre} - ${reserva.personas} personas - ${reserva.fecha} a las ${reserva.hora}`;
-          lista.appendChild(li);
+    function cargarReservas() {
+      fetch('/api/reservas') // asegúrate de usar esta ruta si migraste a Vercel
+        .then(res => res.json())
+        .then(data => {
+          const lista = document.getElementById('lista-reservas');
+          lista.innerHTML = ''; // Limpiar lista actual
+
+          data.forEach(reserva => {
+            const li = document.createElement('li');
+            li.textContent = `${reserva.nombre} - ${reserva.personas} personas - ${reserva.fecha} a las ${reserva.hora}`;
+            lista.appendChild(li);
+          });
+        })
+        .catch(err => {
+          console.error('Error al cargar reservas:', err);
         });
-      })
-      .catch(err => {
-        console.error('Error al cargar reservas:', err);
-        const lista = document.getElementById('lista-reservas');
-        lista.innerHTML = '<li>No se pudieron cargar las reservas.</li>';
-      });
+    }
+
+    // Cargar reservas al inicio
+    cargarReservas();
+
+    // Cargar reservas automáticamente cada minuto (60000 ms)
+    setInterval(cargarReservas, 60000);
   </script>
 </body>
 </html>
