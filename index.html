@@ -6,9 +6,8 @@
 </head>
 <body>
   <h1>Haz tu reserva</h1>
-
   <form id="formulario">
-    <input type="tel" name="telefono" placeholder="TelÃ©fono" required />
+    <input type="tel" name="telefono" placeholder="Teléfono" required />
     <input type="text" name="nombre" placeholder="Nombre" required />
     <input type="number" name="personas" placeholder="Personas" required />
     <input type="time" name="hora" required />
@@ -16,34 +15,28 @@
     <button type="submit">Reservar</button>
   </form>
 
-  <nav>
-    <ul>
-      <li><a href="mostrar-reservas.html">Ver Reservas</a></li>
-    </ul>
-  </nav>
-
   <script>
+    const BASE_URL = '/api'; // Si frontend y backend están en el mismo proyecto en Vercel
+
     const form = document.getElementById('formulario');
-
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', e => {
       e.preventDefault();
-
       const datos = Object.fromEntries(new FormData(form));
 
-      try {
-        const res = await fetch('/api/reservar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(datos)
-        });
-
-        const msg = await res.text();
+      fetch(`${BASE_URL}/reservar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos)
+      })
+      .then(res => res.text())
+      .then(msg => {
         alert(msg);
         form.reset();
-      } catch (err) {
-        alert('Error al enviar la reserva');
+      })
+      .catch(err => {
+        alert('Error al enviar reserva');
         console.error(err);
-      }
+      });
     });
   </script>
 </body>
