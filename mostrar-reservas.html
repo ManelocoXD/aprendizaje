@@ -65,7 +65,7 @@
     }
 
     function cargarReservas() {
-      fetch(`${BASE_URL}/reservas`)
+      fetch(`/api/reservas`)
         .then(res => res.json())
         .then(data => {
           const tbody = document.getElementById('lista-reservas');

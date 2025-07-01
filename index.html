@@ -23,7 +23,7 @@
       e.preventDefault();
       const datos = Object.fromEntries(new FormData(form));
 
-      fetch(`${BASE_URL}/reservar`, {
+      fetch(`/api//reservar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(datos)
