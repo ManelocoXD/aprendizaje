@@ -10,12 +10,11 @@ const db = mysql.createPool({
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end("Método no permitido");
 
-    const { nombre, telefono, personas, hora, fecha } = req.body;
+  const { nombre, telefono, personas, hora, fecha } = req.body;
 
   if (!nombre || !telefono || !personas || !hora || !fecha) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
-
 
   try {
     await db.execute(
