@@ -3,24 +3,90 @@
 <head>
   <meta charset="UTF-8" />
   <title>Mostrar Reservas</title>
+  <style>
+    table {
+      border-collapse: collapse;
+      width: 80%;
+      margin: 20px auto;
+      font-family: Arial, sans-serif;
+    }
+    th, td {
+      border: 1px solid #aaa;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #007BFF;
+      color: white;
+    }
+    tbody tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+    h1 {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      margin-top: 30px;
+    }
+    button {
+      margin: 0 5px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
   <h1>Lista de reservas</h1>
-  <button onclick="cargarReservas()">Actualizar manualmente</button>
-  <ul id="lista-reservas"></ul>
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Teléfono</th>
+        <th>Personas</th>
+        <th>Fecha</th>
+        <th>Hora</th>
+        <th>Estado</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="lista-reservas"></tbody>
+  </table>
 
   <script>
+    const BASE_URL = '/api'; // Puedes poner aquí directamente tu dominio si no lo sirves desde el mismo
+
+    function formatearHora(horaStr) {
+      return horaStr ? horaStr.slice(0, 5) : '';
+    }
+
+    function formatearFecha(fechaStr) {
+      const date = new Date(fechaStr);
+      if (isNaN(date)) return fechaStr;
+      return date.toLocaleDateString('es-ES');
+    }
+
     function cargarReservas() {
-      fetch('/api/reservas') // asegúrate de usar esta ruta si migraste a Vercel
+      fetch(`${BASE_URL}/reservas`)
         .then(res => res.json())
         .then(data => {
-          const lista = document.getElementById('lista-reservas');
-          lista.innerHTML = ''; // Limpiar lista actual
-
+          const tbody = document.getElementById('lista-reservas');
+          tbody.innerHTML = '';
           data.forEach(reserva => {
-            const li = document.createElement('li');
-            li.textContent = `${reserva.nombre} - ${reserva.personas} personas - ${reserva.fecha} a las ${reserva.hora}`;
-            lista.appendChild(li);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${reserva.nombre}</td>
+              <td>${reserva.telefono || ''}</td>
+              <td>${reserva.personas}</td>
+              <td>${formatearFecha(reserva.fecha)}</td>
+              <td>${formatearHora(reserva.hora)}</td>
+              <td>${reserva.estado}</td>
+              <td>
+                ${reserva.estado === 'pendiente' ? `
+                  <button onclick="confirmarReserva(${reserva.id})">Confirmar</button>
+                  <button onclick="denegarReserva(${reserva.id})">Denegar</button>
+                ` : ''}
+              </td>
+            `;
+            tbody.appendChild(tr);
           });
         })
         .catch(err => {
@@ -28,11 +94,28 @@
         });
     }
 
-    // Cargar reservas al inicio
-    cargarReservas();
+    function confirmarReserva(id) {
+      fetch(`${BASE_URL}/reservas/${id}/confirmar`, { method: 'POST' })
+        .then(res => res.text())
+        .then(msg => {
+          alert(msg);
+          cargarReservas();
+        })
+        .catch(() => alert('Error al confirmar reserva'));
+    }
 
-    // Cargar reservas automáticamente cada minuto (60000 ms)
-    setInterval(cargarReservas, 10000);
+    function denegarReserva(id) {
+      fetch(`${BASE_URL}/reservas/${id}`, { method: 'DELETE' })
+        .then(res => res.text())
+        .then(msg => {
+          alert(msg);
+          cargarReservas();
+        })
+        .catch(() => alert('Error al eliminar reserva'));
+    }
+
+    cargarReservas();
+    setInterval(cargarReservas, 10000); // actualiza cada minuto automáticamente
   </script>
 </body>
 </html>
