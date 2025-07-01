@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
     const { nombre, telefono, personas, hora, fecha } = req.body;
 
-  if (!nombre || telefono || !personas || !hora || !fecha) {
+  if (!nombre || !telefono || !personas || !hora || !fecha) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
 
