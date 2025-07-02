@@ -1,4 +1,5 @@
-import mysql from "mysql2/promise";
+// /api/reservas.js
+const mysql = require("mysql2/promise");
 
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -7,39 +8,37 @@ const db = mysql.createPool({
   database: process.env.DB_NAME,
 });
 
-export default async function handler(req, res) {
-  const connection = await mysql.createConnection(dbConfig);
-
-  if (req.method === 'GET') {
+module.exports = async (req, res) => {
+  if (req.method === "GET") {
     try {
-      const [rows] = await connection.execute('SELECT * FROM reservas ORDER BY fecha, hora');
+      const [rows] = await db.query("SELECT * FROM reservas ORDER BY fecha, hora");
       res.status(200).json(rows);
     } catch (err) {
-      console.error(err);
-      res.status(500).send('Error al obtener reservas');
-    } finally {
-      await connection.end();
+      console.error("Error al obtener reservas:", err);
+      res.status(500).send("Error al obtener reservas");
     }
   }
 
-  if (req.method === 'POST') {
+  else if (req.method === "POST") {
     const { nombre, telefono, personas, hora, fecha } = req.body;
 
     if (!nombre || !telefono || !personas || !hora || !fecha) {
-      return res.status(400).send('Faltan datos');
+      return res.status(400).send("Faltan datos");
     }
 
     try {
-      await connection.execute(
-        'INSERT INTO reservas (nombre, telefono, personas, hora, fecha) VALUES (?, ?, ?, ?, ?, ?)',
-        [nombre, telefono, personas, hora, fecha,]
+      await db.execute(
+        "INSERT INTO reservas (nombre, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?)",
+        [nombre, telefono, personas, hora, fecha, "pendiente"]
       );
-      res.status(200).send('Reserva guardada correctamente');
+      res.status(200).send("Reserva guardada correctamente");
     } catch (err) {
-      console.error(err);
-      res.status(500).send('Error al guardar la reserva');
-    } finally {
-      await connection.end();
+      console.error("Error al guardar la reserva:", err);
+      res.status(500).send("Error al guardar la reserva");
     }
   }
-}
+
+  else {
+    res.status(405).send("Método no permitido");
+  }
+};
