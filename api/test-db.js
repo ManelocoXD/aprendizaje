@@ -1,4 +1,5 @@
-import mysql from "mysql2/promise";
+// api/test-db.js
+const mysql = require("mysql2/promise");
 
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -7,7 +8,7 @@ const db = mysql.createPool({
   database: process.env.DB_NAME,
 });
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   try {
     const [rows] = await db.query("SELECT 1 + 1 AS result");
     res.status(200).json({ success: true, result: rows[0].result });
@@ -15,4 +16,4 @@ export default async function handler(req, res) {
     console.error("Error al conectar a la base de datos:", err);
     res.status(500).json({ success: false, error: err.message });
   }
-}
+};
