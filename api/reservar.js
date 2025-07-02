@@ -18,8 +18,8 @@ export default async function handler(req, res) {
 
   try {
     await db.execute(
-      'INSERT INTO reservas (nombre, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?)',
-      [nombre, telefono, personas, hora, fecha, 'pendiente']
+      'INSERT INTO reservas (nombre, telefono, personas, hora, fecha) VALUES (?, ?, ?, ?, ?, ?)',
+      [nombre, telefono, personas, hora, fecha]
     );
     res.status(200).send("Reserva guardada");
   } catch (err) {
