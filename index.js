@@ -140,7 +140,7 @@ function formatearFecha(fechaStr) {
 
   return `${diaSemana} día ${dia} de ${mes}`;
 }
-
+// adios
 app.listen(3000, () => {
   console.log('Servidor escuchando en https://aprendizaje-q0q8.onrender.com/reservar');
 });
