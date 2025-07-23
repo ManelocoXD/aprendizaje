@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
   <meta charset="UTF-8" />
   <title>Crear Reserva</title>
@@ -14,34 +14,26 @@
     <input type="date" name="fecha" required />
     <button type="submit">Reservar</button>
   </form>
-    <nav>
-        <ul>
 
-            <li><a href="mostrar-reservas.html">Reservas</a></li>
-        </ul>
-    </nav>
   <script>
-    const BASE_URL = '/api'; // Si frontend y backend están en el mismo proyecto en Vercel
-
     const form = document.getElementById('formulario');
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
       const datos = Object.fromEntries(new FormData(form));
 
-      fetch(`/api/reservar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(datos)
-      })
-      .then(res => res.text())
-      .then(msg => {
-        alert(msg);
+      try {
+        const res = await fetch('/api/reservar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(datos),
+        });
+        const mensaje = await res.text();
+        alert(mensaje);
         form.reset();
-      })
-      .catch(err => {
-        alert('Error al enviar reserva');
+      } catch (err) {
+        alert('Error al enviar la reserva');
         console.error(err);
-      });
+      }
     });
   </script>
 </body>

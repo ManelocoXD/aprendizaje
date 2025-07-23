@@ -10,6 +10,11 @@ app.use(express.json());
 // Servir archivos estáticos desde /public
 app.use(express.static(path.join(__dirname, 'public')));
 
+const accountSid = 'AC0b6c2e5167cfadf5e065b8656e66daa7';
+const authToken = 'f112aad0335ad5cb201b21205809f53b';
+const twilioNumber = '+19473334306';
+const twilioClient = twilio(accountSid, authToken);
+
 // Conexión a la base de datos
 const db = mysql.createConnection({
   host: 'btbn32pgv8nw8oj4llq0-mysql.services.clever-cloud.com',
@@ -56,6 +61,74 @@ app.get('/reservas', (req, res) => {
     res.json(results);
   });
 });
+
+// Confirmar reserva
+app.post('/reservas/:id/confirmar', (req, res) => {
+  const id = req.params.id;
+
+  db.query('SELECT * FROM reservas WHERE id = ?', [id], (err, results) => {
+    if (err || results.length === 0) return res.status(404).send('Reserva no encontrada');
+
+    const reserva = results[0];
+    console.log('Fecha original reserva confirmar:', reserva.fecha);
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    const mensaje = `Hola ${reserva.nombre} tu reserva para el ${fechaFormateada} a las ${reserva.hora}h ha sido confirmada.`;
+
+    db.query('UPDATE reservas SET estado = "confirmada" WHERE id = ?', [id], (err2) => {
+      if (err2) return res.status(500).send('Error al confirmar reserva');
+
+      twilioClient.messages.create({
+        body: mensaje,
+        from: twilioNumber,
+        to: reserva.telefono
+      }).then(() => {
+        res.send('Reserva confirmada y SMS enviado');
+      }).catch((smsErr) => {
+        console.error('Error al enviar SMS:', smsErr.message);
+        res.status(500).send('Reserva confirmada pero error al enviar SMS');
+      });
+    });
+  });
+});
+
+// Denegar y eliminar reserva
+app.delete('/reservas/:id/denegar', (req, res) => {
+  const id = req.params.id;
+
+  db.query('SELECT * FROM reservas WHERE id = ?', [id], (err, results) => {
+    if (err || results.length === 0) return res.status(404).send('Reserva no encontrada');
+
+    const reserva = results[0];
+    console.log('Fecha original reserva denegar:', reserva.fecha);
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    const mensaje = `Hola ${reserva.nombre}, lamentamos informarte que tu reserva para el ${fechaFormateada} a las ${reserva.hora} ha sido denegada.`;
+
+    twilioClient.messages.create({
+      body: mensaje,
+      from: twilioNumber,
+      to: reserva.telefono
+    }).then(() => {
+      db.query('DELETE FROM reservas WHERE id = ?', [id], (err2) => {
+        if (err2) return res.status(500).send('Error al eliminar reserva');
+        res.send('Reserva denegada, SMS enviado y reserva eliminada');
+      });
+    }).catch((smsErr) => {
+      console.error('Error al enviar SMS de denegación:', smsErr.message);
+      res.status(500).send('Error al enviar SMS de denegación');
+    });
+  });
+});
+
+// Eliminar reserva sin SMS
+app.delete('/reservas/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('DELETE FROM reservas WHERE id = ?', [id], (err) => {
+    if (err) return res.status(500).send('Error al eliminar reserva');
+    res.send('Reserva eliminada correctamente');
+  });
+});
+
+
 
 app.listen(3000, () => {
   console.log('Servidor escuchando en https://aprendizaje-q0q8.onrender.com/reservar');

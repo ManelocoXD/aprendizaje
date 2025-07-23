@@ -2,21 +2,21 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Mostrar Reservas</title>
+  <title>Lista de Reservas</title>
   <style>
     table {
       border-collapse: collapse;
-      width: 80%;
+      width: 90%;
       margin: 20px auto;
       font-family: Arial, sans-serif;
     }
     th, td {
-      border: 1px solid #aaa;
-      padding: 8px 12px;
+      border: 1px solid #ccc;
+      padding: 8px;
       text-align: center;
     }
     th {
-      background-color: #007BFF;
+      background-color: #333;
       color: white;
     }
     tbody tr:nth-child(even) {
@@ -28,14 +28,14 @@
       margin-top: 30px;
     }
     button {
-      margin: 0 5px;
+      margin: 0 3px;
       padding: 4px 8px;
       cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Lista de reservas</h1>
+  <h1>Reservas recibidas</h1>
   <table>
     <thead>
       <tr>
@@ -52,8 +52,6 @@
   </table>
 
   <script>
-    const BASE_URL = '/api'; // Puedes poner aquí directamente tu dominio si no lo sirves desde el mismo
-
     function formatearHora(horaStr) {
       return horaStr ? horaStr.slice(0, 5) : '';
     }
@@ -64,58 +62,49 @@
       return date.toLocaleDateString('es-ES');
     }
 
-    function cargarReservas() {
-      fetch(`/api/reservas`)
-        .then(res => res.json())
-        .then(data => {
-          const tbody = document.getElementById('lista-reservas');
-          tbody.innerHTML = '';
-          data.forEach(reserva => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-              <td>${reserva.nombre}</td>
-              <td>${reserva.telefono || ''}</td>
-              <td>${reserva.personas}</td>
-              <td>${formatearFecha(reserva.fecha)}</td>
-              <td>${formatearHora(reserva.hora)}</td>
-              <td>${reserva.estado}</td>
-              <td>
-                ${reserva.estado === 'pendiente' ? `
-                  <button onclick="confirmarReserva(${reserva.id})">Confirmar</button>
-                  <button onclick="denegarReserva(${reserva.id})">Denegar</button>
-                ` : ''}
-              </td>
-            `;
-            tbody.appendChild(tr);
-          });
-        })
-        .catch(err => {
-          console.error('Error al cargar reservas:', err);
+    async function cargarReservas() {
+      try {
+        const res = await fetch('/api/reservas');
+        const data = await res.json();
+        const tbody = document.getElementById('lista-reservas');
+        tbody.innerHTML = '';
+        data.forEach(reserva => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${reserva.nombre}</td>
+            <td>${reserva.telefono}</td>
+            <td>${reserva.personas}</td>
+            <td>${formatearFecha(reserva.fecha)}</td>
+            <td>${formatearHora(reserva.hora)}</td>
+            <td>${reserva.estado}</td>
+            <td>
+              ${reserva.estado === 'pendiente' ? `
+                <button onclick="confirmar(${reserva.id})">Confirmar</button>
+                <button onclick="denegar(${reserva.id})">Denegar</button>
+              ` : ''}
+            </td>
+          `;
+          tbody.appendChild(tr);
         });
+      } catch (err) {
+        console.error('Error al cargar reservas:', err);
+      }
     }
 
-    function confirmarReserva(id) {
-      fetch(`${BASE_URL}/reservas/${id}/confirmar`, { method: 'POST' })
-        .then(res => res.text())
-        .then(msg => {
-          alert(msg);
-          cargarReservas();
-        })
-        .catch(() => alert('Error al confirmar reserva'));
+    async function confirmar(id) {
+      const res = await fetch(`/api/reservas/${id}/confirmar`, { method: 'POST' });
+      alert(await res.text());
+      cargarReservas();
     }
 
-    function denegarReserva(id) {
-      fetch(`${BASE_URL}/reservas/${id}`, { method: 'DELETE' })
-        .then(res => res.text())
-        .then(msg => {
-          alert(msg);
-          cargarReservas();
-        })
-        .catch(() => alert('Error al eliminar reserva'));
+    async function denegar(id) {
+      const res = await fetch(`/api/reservas/${id}/denegar`, { method: 'DELETE' });
+      alert(await res.text());
+      cargarReservas();
     }
 
     cargarReservas();
-    setInterval(cargarReservas, 10000); // actualiza cada minuto automáticamente
+    setInterval(cargarReservas, 60000); // refrescar cada minuto
   </script>
 </body>
 </html>
