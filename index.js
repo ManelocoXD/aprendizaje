@@ -10,11 +10,6 @@ app.use(express.json());
 // Servir archivos estáticos desde /public
 app.use(express.static(path.join(__dirname, 'public')));
 
-const accountSid = 'AC0b6c2e5167cfadf5e065b8656e66daa7';
-const authToken = 'f112aad0335ad5cb201b21205809f53b';
-const twilioNumber = '+19473334306';
-const twilioClient = twilio(accountSid, authToken);
-
 // Conexión a la base de datos
 const db = mysql.createConnection({
   host: 'btbn32pgv8nw8oj4llq0-mysql.services.clever-cloud.com',
@@ -128,7 +123,23 @@ app.delete('/reservas/:id', (req, res) => {
   });
 });
 
+function formatearFecha(fechaStr) {
+  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
+  // Crear objeto Date válido
+  const fecha = new Date(fechaStr);
+  if (isNaN(fecha)) {
+    console.log('Fecha inválida:', fechaStr);
+    return fechaStr; // Si la fecha no es válida, devolver el string tal cual para evitar errores
+  }
+
+  const diaSemana = diasSemana[fecha.getDay()];
+  const dia = fecha.getDate();
+  const mes = meses[fecha.getMonth()];
+
+  return `${diaSemana} día ${dia} de ${mes}`;
+}
 
 app.listen(3000, () => {
   console.log('Servidor escuchando en https://aprendizaje-q0q8.onrender.com/reservar');
