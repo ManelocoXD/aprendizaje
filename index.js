@@ -2,6 +2,8 @@ const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const path = require('path');
+const twilio = require('twilio');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
@@ -10,12 +12,16 @@ app.use(express.json());
 // Servir archivos estáticos desde /public
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Configuración de Twilio
+const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+const twilioNumber = process.env.TWILIO_FROM;
+
 // Conexión a la base de datos
 const db = mysql.createConnection({
-  host: 'btbn32pgv8nw8oj4llq0-mysql.services.clever-cloud.com',
-  user: 'ulvkzoepxs27anjn',
-  password: 'qR7tInn5sq9IFrWBjB9H',       // Cambia si tienes otra contraseña
-  database: 'btbn32pgv8nw8oj4llq0' // Asegúrate que esta base existe y tiene tabla reservas
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
 });
 
 db.connect(err => {
@@ -26,16 +32,16 @@ db.connect(err => {
   console.log('Conectado a la base de datos MySQL');
 });
 
-// Insertar reserva
+// Insertar reserva (CORREGIDO: incluye teléfono)
 app.post('/reservar', (req, res) => {
-  const { nombre, personas, hora, fecha } = req.body;
-  if (!nombre || !personas || !hora || !fecha) {
+  const { nombre, telefono, personas, hora, fecha } = req.body;
+  if (!nombre || !telefono || !personas || !hora || !fecha) {
     return res.status(400).send('Faltan datos obligatorios');
   }
 
   db.query(
-    'INSERT INTO reservas (nombre, personas, hora, fecha) VALUES (?, ?, ?, ?)',
-    [nombre, personas, hora, fecha],
+    'INSERT INTO reservas (nombre, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?)',
+    [nombre, telefono, personas, hora, fecha, 'pendiente'],
     (err) => {
       if (err) {
         console.error(err);
@@ -57,59 +63,100 @@ app.get('/reservas', (req, res) => {
   });
 });
 
-// Confirmar reserva
+// Confirmar reserva (CORREGIDO)
 app.post('/reservas/:id/confirmar', (req, res) => {
   const id = req.params.id;
 
   db.query('SELECT * FROM reservas WHERE id = ?', [id], (err, results) => {
-    if (err || results.length === 0) return res.status(404).send('Reserva no encontrada');
+    if (err) {
+      console.error('Error al buscar reserva:', err);
+      return res.status(500).send('Error al buscar reserva');
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).send('Reserva no encontrada');
+    }
 
     const reserva = results[0];
-    console.log('Fecha original reserva confirmar:', reserva.fecha);
-    const fechaFormateada = formatearFecha(reserva.fecha);
-    const mensaje = `Hola ${reserva.nombre} tu reserva para el ${fechaFormateada} a las ${reserva.hora}h ha sido confirmada.`;
+    console.log('Reserva encontrada:', reserva);
+    
+    // Actualizar estado a confirmada
+    db.query('UPDATE reservas SET estado = ? WHERE id = ?', ['confirmada', id], (err2) => {
+      if (err2) {
+        console.error('Error al actualizar reserva:', err2);
+        return res.status(500).send('Error al confirmar reserva');
+      }
 
-    db.query('UPDATE reservas SET estado = "confirmada" WHERE id = ?', [id], (err2) => {
-      if (err2) return res.status(500).send('Error al confirmar reserva');
+      // Enviar SMS
+      const fechaFormateada = formatearFecha(reserva.fecha);
+      const mensaje = `Hola ${reserva.nombre}, tu reserva para el ${fechaFormateada} a las ${reserva.hora} ha sido confirmada. ¡Te esperamos!`;
+      
+      // Asegurar formato de teléfono español
+      let telefonoCompleto = reserva.telefono;
+      if (!telefonoCompleto.startsWith('+')) {
+        telefonoCompleto = '+34' + telefonoCompleto.replace(/^0+/, '');
+      }
 
       twilioClient.messages.create({
         body: mensaje,
         from: twilioNumber,
-        to: reserva.telefono
-      }).then(() => {
+        to: telefonoCompleto
+      }).then((message) => {
+        console.log('SMS enviado:', message.sid);
         res.send('Reserva confirmada y SMS enviado');
       }).catch((smsErr) => {
-        console.error('Error al enviar SMS:', smsErr.message);
-        res.status(500).send('Reserva confirmada pero error al enviar SMS');
+        console.error('Error al enviar SMS:', smsErr);
+        res.status(200).send('Reserva confirmada pero error al enviar SMS: ' + smsErr.message);
       });
     });
   });
 });
 
-// Denegar y eliminar reserva
+// Denegar y eliminar reserva (CORREGIDO)
 app.delete('/reservas/:id/denegar', (req, res) => {
   const id = req.params.id;
 
   db.query('SELECT * FROM reservas WHERE id = ?', [id], (err, results) => {
-    if (err || results.length === 0) return res.status(404).send('Reserva no encontrada');
+    if (err) {
+      console.error('Error al buscar reserva:', err);
+      return res.status(500).send('Error al buscar reserva');
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).send('Reserva no encontrada');
+    }
 
     const reserva = results[0];
-    console.log('Fecha original reserva denegar:', reserva.fecha);
     const fechaFormateada = formatearFecha(reserva.fecha);
-    const mensaje = `Hola ${reserva.nombre}, lamentamos informarte que tu reserva para el ${fechaFormateada} a las ${reserva.hora} ha sido denegada.`;
+    const mensaje = `Hola ${reserva.nombre}, lamentamos informarte que tu reserva para el ${fechaFormateada} a las ${reserva.hora} no ha podido ser confirmada.`;
+
+    // Asegurar formato de teléfono español
+    let telefonoCompleto = reserva.telefono;
+    if (!telefonoCompleto.startsWith('+')) {
+      telefonoCompleto = '+34' + telefonoCompleto.replace(/^0+/, '');
+    }
 
     twilioClient.messages.create({
       body: mensaje,
       from: twilioNumber,
-      to: reserva.telefono
+      to: telefonoCompleto
     }).then(() => {
       db.query('DELETE FROM reservas WHERE id = ?', [id], (err2) => {
-        if (err2) return res.status(500).send('Error al eliminar reserva');
+        if (err2) {
+          console.error('Error al eliminar reserva:', err2);
+          return res.status(500).send('Error al eliminar reserva');
+        }
         res.send('Reserva denegada, SMS enviado y reserva eliminada');
       });
     }).catch((smsErr) => {
-      console.error('Error al enviar SMS de denegación:', smsErr.message);
-      res.status(500).send('Error al enviar SMS de denegación');
+      console.error('Error al enviar SMS de denegación:', smsErr);
+      // Eliminar la reserva aunque falle el SMS
+      db.query('DELETE FROM reservas WHERE id = ?', [id], (err2) => {
+        if (err2) {
+          return res.status(500).send('Error al eliminar reserva');
+        }
+        res.status(200).send('Reserva eliminada pero error al enviar SMS: ' + smsErr.message);
+      });
     });
   });
 });
@@ -118,7 +165,10 @@ app.delete('/reservas/:id/denegar', (req, res) => {
 app.delete('/reservas/:id', (req, res) => {
   const id = req.params.id;
   db.query('DELETE FROM reservas WHERE id = ?', [id], (err) => {
-    if (err) return res.status(500).send('Error al eliminar reserva');
+    if (err) {
+      console.error('Error al eliminar reserva:', err);
+      return res.status(500).send('Error al eliminar reserva');
+    }
     res.send('Reserva eliminada correctamente');
   });
 });
@@ -127,11 +177,10 @@ function formatearFecha(fechaStr) {
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-  // Crear objeto Date válido
-  const fecha = new Date(fechaStr);
+  const fecha = new Date(fechaStr + 'T00:00:00'); // Evitar problemas de zona horaria
   if (isNaN(fecha)) {
     console.log('Fecha inválida:', fechaStr);
-    return fechaStr; // Si la fecha no es válida, devolver el string tal cual para evitar errores
+    return fechaStr;
   }
 
   const diaSemana = diasSemana[fecha.getDay()];
@@ -140,7 +189,8 @@ function formatearFecha(fechaStr) {
 
   return `${diaSemana} día ${dia} de ${mes}`;
 }
-// adios
-app.listen(3000, () => {
-  console.log('Servidor escuchando en https://aprendizaje-q0q8.onrender.com/reservar');
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
