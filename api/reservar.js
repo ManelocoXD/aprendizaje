@@ -10,16 +10,17 @@ const db = mysql.createPool({
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).end("Método no permitido");
 
-  const { nombre, email, telefono, personas, hora, fecha } = req.body;
+  const { nombre, telefono, email, personas, hora, fecha } = req.body;
 
-  if (!nombre || !email || !telefono || !personas || !hora || !fecha) {
+  // Email es opcional, los demás son obligatorios
+  if (!nombre || !telefono || !personas || !hora || !fecha) {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
   try {
     await db.execute(
-      "INSERT INTO reservas (nombre, email, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [nombre, email, telefono, personas, hora, fecha, "pendiente"]
+      "INSERT INTO reservas (nombre, telefono, email, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [nombre, telefono, email || null, personas, hora, fecha, "pendiente"]
     );
     res.status(200).send("Reserva guardada");
   } catch (err) {

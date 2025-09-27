@@ -6,7 +6,7 @@
   <style>
     table {
       border-collapse: collapse;
-      width: 90%;
+      width: 95%;
       margin: 20px auto;
       font-family: Arial, sans-serif;
     }
@@ -29,8 +29,23 @@
     }
     button {
       margin: 0 3px;
-      padding: 4px 8px;
+      padding: 6px 12px;
       cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      color: white;
+    }
+    .confirmar {
+      background-color: #28a745;
+    }
+    .denegar {
+      background-color: #dc3545;
+    }
+    .confirmar:hover {
+      background-color: #218838;
+    }
+    .denegar:hover {
+      background-color: #c82333;
     }
   </style>
 </head>
@@ -40,7 +55,7 @@
     <thead>
       <tr>
         <th>Nombre</th>
-        <th>Mail</th>
+        <th>Email</th>
         <th>Teléfono</th>
         <th>Personas</th>
         <th>Fecha</th>
@@ -65,15 +80,24 @@
 
     async function cargarReservas() {
       try {
+        console.log('Cargando reservas...');
         const res = await fetch('/api/reservas');
+        
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         const data = await res.json();
+        console.log('Reservas cargadas:', data);
+        
         const tbody = document.getElementById('lista-reservas');
         tbody.innerHTML = '';
+        
         data.forEach(reserva => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${reserva.nombre}</td>
-            <td>${reserva.mail}</td>
+            <td>${reserva.email || 'No proporcionado'}</td>
             <td>${reserva.telefono}</td>
             <td>${reserva.personas}</td>
             <td>${formatearFecha(reserva.fecha)}</td>
@@ -81,32 +105,76 @@
             <td>${reserva.estado}</td>
             <td>
               ${reserva.estado === 'pendiente' ? `
-                <button onclick="confirmar(${reserva.id})">Confirmar</button>
-                <button onclick="denegar(${reserva.id})">Denegar</button>
-              ` : ''}
+                <button class="confirmar" onclick="confirmar(${reserva.id})">Confirmar</button>
+                <button class="denegar" onclick="denegar(${reserva.id})">Denegar</button>
+              ` : `<span>-</span>`}
             </td>
           `;
           tbody.appendChild(tr);
         });
       } catch (err) {
         console.error('Error al cargar reservas:', err);
+        alert('Error al cargar reservas: ' + err.message);
       }
     }
 
     async function confirmar(id) {
-      const res = await fetch(`/api/reservas/${id}/confirmar`, { method: 'POST' });
-      alert(await res.text());
-      cargarReservas();
+      try {
+        console.log('Confirmando reserva ID:', id);
+        const res = await fetch(`/api/reservas/${id}/confirmar`, { 
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const result = await res.text();
+        console.log('Respuesta confirmar:', result);
+        
+        if (res.ok) {
+          alert('Reserva confirmada exitosamente');
+        } else {
+          alert('Error al confirmar: ' + result);
+        }
+        
+        cargarReservas();
+      } catch (err) {
+        console.error('Error al confirmar reserva:', err);
+        alert('Error al confirmar reserva: ' + err.message);
+      }
     }
 
     async function denegar(id) {
-      const res = await fetch(`/api/reservas/${id}/denegar`, { method: 'DELETE' });
-      alert(await res.text());
-      cargarReservas();
+      try {
+        console.log('Denegando reserva ID:', id);
+        const res = await fetch(`/api/reservas/${id}/denegar`, { 
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const result = await res.text();
+        console.log('Respuesta denegar:', result);
+        
+        if (res.ok) {
+          alert('Reserva denegada exitosamente');
+        } else {
+          alert('Error al denegar: ' + result);
+        }
+        
+        cargarReservas();
+      } catch (err) {
+        console.error('Error al denegar reserva:', err);
+        alert('Error al denegar reserva: ' + err.message);
+      }
     }
 
+    // Cargar reservas al inicio
     cargarReservas();
-    setInterval(cargarReservas, 60000); // refrescar cada minuto
+    
+    // Refrescar cada minuto
+    setInterval(cargarReservas, 60000);
   </script>
 </body>
 </html>

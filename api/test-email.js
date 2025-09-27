@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       message: "Estado de configuración EmailJS",
       environment: envCheck,
-      allConfigured: Object.values(envCheck).every(Boolean),
+      allConfigured: envCheck.EMAILJS_SERVICE_ID && envCheck.EMAILJS_TEMPLATE_ID && envCheck.EMAILJS_PUBLIC_KEY && envCheck.RESTAURANT_EMAIL,
       instructions: "Envía un POST con { email: 'test@example.com', tipo: 'general' } para probar"
     });
   }
@@ -96,7 +96,7 @@ Lamentamos informarte que tu reserva no ha podido ser confirmada:
 MOTIVO: No hay disponibilidad para esa fecha y hora.
 
 ¿Te interesa otra fecha? Contacta con nosotros:
-📞 Teléfono: ${process.env.RESTAURANT_PHONE || '+34612345678'}
+📞 Teléfono: ${process.env.RESTAURANT_PHONE || 'Contacta directamente al restaurante'}
 📧 Email: ${process.env.RESTAURANT_EMAIL}
 
 *** ESTO ES UN EMAIL DE PRUEBA ***`,
@@ -144,10 +144,54 @@ Fecha: ${new Date().toLocaleString('es-ES')}`,
   } catch (err) {
     console.error("Error al enviar email:", err);
     
+    // Extraer más información del error
+    let errorInfo = {
+      message: err.message || 'Error desconocido',
+      status: err.status || 'unknown',
+      text: err.text || 'No disponible',
+      name: err.name || 'Error',
+      code: err.code || 'No disponible'
+    };
+    
+    // Si es un error de EmailJS, extraer más detalles
+    if (err.status) {
+      switch (err.status) {
+        case 400:
+          errorInfo.suggestion = "Error 400: Parámetros incorrectos. Verifica Service ID, Template ID y formato del template.";
+          break;
+        case 401:
+          errorInfo.suggestion = "Error 401: Autenticación fallida. Verifica tu Public Key y Private Key.";
+          break;
+        case 404:
+          errorInfo.suggestion = "Error 404: Service ID o Template ID no encontrado. Verifica que existan en EmailJS.";
+          break;
+        case 422:
+          errorInfo.suggestion = "Error 422: Error en el template. Verifica que tenga las variables correctas.";
+          break;
+        default:
+          errorInfo.suggestion = `Error ${err.status}: Revisa la documentación de EmailJS.`;
+      }
+    } else {
+      // Errores comunes sin código de estado
+      if (err.message.includes('fetch')) {
+        errorInfo.suggestion = "Error de conexión. Verifica tu conexión a internet.";
+      } else if (err.message.includes('User ID')) {
+        errorInfo.suggestion = "Error de User ID. Verifica tu Public Key en EmailJS.";
+      } else {
+        errorInfo.suggestion = "Error desconocido. Verifica todas las configuraciones.";
+      }
+    }
+    
     res.status(400).json({
       error: "Error al enviar email",
-      details: err.message,
-      stack: err.stack
+      details: errorInfo.message,
+      fullError: errorInfo,
+      config: {
+        serviceId: process.env.EMAILJS_SERVICE_ID || 'NOT SET',
+        templateId: process.env.EMAILJS_TEMPLATE_ID || 'NOT SET',
+        publicKey: process.env.EMAILJS_PUBLIC_KEY ? 'SET' : 'NOT SET',
+        privateKey: process.env.EMAILJS_PRIVATE_KEY ? 'SET' : 'NOT SET'
+      }
     });
   }
-};
+}; 
