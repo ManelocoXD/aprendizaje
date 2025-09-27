@@ -12,13 +12,13 @@ module.exports = async (req, res) => {
 
   const { nombre, email, telefono, personas, hora, fecha } = req.body;
 
-  if (!nombre || !email ||!telefono || !personas || !hora || !fecha) {
+  if (!nombre || email ||!telefono || !personas || !hora || !fecha) {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
   try {
     await db.execute(
-      "INSERT INTO reservas (nombre, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO reservas (nombre, email, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?)",
       [nombre, email, telefono, personas, hora, fecha, "pendiente"]
     );
     res.status(200).send("Reserva guardada");
