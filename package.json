@@ -10,6 +10,6 @@
   "license": "ISC",
   "dependencies": {
     "@emailjs/nodejs": "^4.0.0",
-    "mysql2": "^3.14.1"
+    "@supabase/supabase-js": "^2.45.4"
   }
 }

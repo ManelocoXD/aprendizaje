@@ -1,15 +1,10 @@
-const mysql = require("mysql2/promise");
+const { createClient } = require('@supabase/supabase-js');
 const emailjs = require("@emailjs/nodejs");
 
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 function formatearFecha(fechaStr) {
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -29,47 +24,58 @@ function formatearFecha(fechaStr) {
 }
 
 module.exports = async (req, res) => {
-  // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método no permitido" });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   const id = req.query.id;
-  if (!id) {
-    return res.status(400).json({ error: "Falta el ID" });
-  }
+  if (!id) return res.status(400).json({ error: "Falta el ID" });
 
   try {
-    console.log('Procesando confirmación de reserva ID:', id);
+    console.log('Confirmando reserva ID:', id);
     
-    // Obtener la reserva completa
-    const [reservas] = await db.query("SELECT * FROM reservas WHERE id = ?", [id]);
-    
-    if (reservas.length === 0) {
+    // Obtener la reserva
+    const { data: reserva, error: selectError } = await supabase
+      .from('reservas')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (selectError || !reserva) {
+      console.error('Error al obtener reserva:', selectError);
       return res.status(404).json({ error: "Reserva no encontrada" });
     }
-    
-    const reserva = reservas[0];
+
     console.log('Reserva encontrada:', reserva);
-    
-    // Actualizar estado a confirmada
-    await db.execute("UPDATE reservas SET estado = 'confirmada' WHERE id = ?", [id]);
+
+    // Actualizar estado
+    const { error: updateError } = await supabase
+      .from('reservas')
+      .update({ estado: 'confirmada' })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('Error al actualizar reserva:', updateError);
+      return res.status(500).json({ error: "Error al actualizar reserva" });
+    }
+
     console.log('Estado actualizado a confirmada');
 
-    // Enviar email de confirmación si hay email, si no hay, enviar notificación al restaurante
-    if (reserva.email) {
-      await enviarEmailConfirmacion(reserva);
-    } else {
-      // Enviar notificación al restaurante con datos de contacto
-      await enviarNotificacionRestaurante(reserva, 'confirmada');
+    // Enviar email
+    try {
+      if (reserva.email) {
+        await enviarEmailConfirmacion(reserva);
+        console.log('Email de confirmación enviado al cliente');
+      } else {
+        await enviarNotificacionRestaurante(reserva, 'confirmada');
+        console.log('Notificación enviada al restaurante');
+      }
+    } catch (emailError) {
+      console.error('Error al enviar email:', emailError);
+      // No fallar la operación si el email falla
     }
     
     res.status(200).json({ 
@@ -87,14 +93,13 @@ module.exports = async (req, res) => {
 };
 
 async function enviarEmailConfirmacion(reserva) {
-  try {
-    const fechaFormateada = formatearFecha(reserva.fecha);
-    
-    const templateParams = {
-      to_name: reserva.nombre,
-      to_email: reserva.email,
-      subject: "Reserva Confirmada ✅",
-      message: `¡Hola ${reserva.nombre}!
+  const fechaFormateada = formatearFecha(reserva.fecha);
+  
+  const templateParams = {
+    to_name: reserva.nombre,
+    to_email: reserva.email,
+    subject: "Reserva Confirmada ✅",
+    message: `¡Hola ${reserva.nombre}!
 
 Tu reserva ha sido CONFIRMADA:
 
@@ -106,62 +111,47 @@ Tu reserva ha sido CONFIRMADA:
 ¡Te esperamos! Gracias por elegirnos.
 
 Si necesitas modificar algo, contacta con nosotros.`,
-      reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
-    };
+    reply_to: process.env.RESTAURANT_EMAIL
+  };
 
-    await emailjs.send(
-      process.env.EMAILJS_SERVICE_ID,
-      process.env.EMAILJS_TEMPLATE_ID, // Solo un template
-      templateParams,
-      {
-        publicKey: process.env.EMAILJS_PUBLIC_KEY,
-        privateKey: process.env.EMAILJS_PRIVATE_KEY,
-      }
-    );
-    
-    console.log('Email de confirmación enviado exitosamente');
-  } catch (error) {
-    console.error('Error al enviar email de confirmación:', error);
-    throw error;
-  }
+  await emailjs.send(
+    process.env.EMAILJS_SERVICE_ID,
+    process.env.EMAILJS_TEMPLATE_ID,
+    templateParams,
+    {
+      publicKey: process.env.EMAILJS_PUBLIC_KEY,
+      privateKey: process.env.EMAILJS_PRIVATE_KEY,
+    }
+  );
 }
 
 async function enviarNotificacionRestaurante(reserva, accion) {
-  try {
-    const fechaFormateada = formatearFecha(reserva.fecha);
-    const asunto = accion === 'confirmada' ? 'Reserva Confirmada ✅' : 'Reserva Denegada ❌';
-    
-    const templateParams = {
-      to_name: "Equipo del Restaurante",
-      to_email: process.env.RESTAURANT_EMAIL,
-      subject: `${asunto} - Contactar cliente`,
-      message: `Se ha ${accion} una reserva. Datos del cliente para contactar:
+  const fechaFormateada = formatearFecha(reserva.fecha);
+  
+  const templateParams = {
+    to_name: "Equipo del Restaurante",
+    to_email: process.env.RESTAURANT_EMAIL,
+    subject: "Reserva Confirmada ✅ - Contactar cliente",
+    message: `Se ha confirmado una reserva. Datos del cliente para contactar:
 
 👤 Cliente: ${reserva.nombre}
 📞 Teléfono: ${reserva.telefono}
+📧 Email: ${reserva.email || 'No proporcionado'}
 📅 Fecha: ${fechaFormateada}
 🕐 Hora: ${reserva.hora}
 👥 Personas: ${reserva.personas}
 
-${accion === 'confirmada' ? 
-  'ACCIÓN: Contacta al cliente para confirmar los detalles finales.' : 
-  'ACCIÓN: Se ha informado al cliente. Considera ofrecer fechas alternativas.'}`,
-      reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
-    };
+ACCIÓN: Contacta al cliente para confirmar los detalles finales.`,
+    reply_to: process.env.RESTAURANT_EMAIL
+  };
 
-    await emailjs.send(
-      process.env.EMAILJS_SERVICE_ID,
-      process.env.EMAILJS_TEMPLATE_ID, // Mismo template
-      templateParams,
-      {
-        publicKey: process.env.EMAILJS_PUBLIC_KEY,
-        privateKey: process.env.EMAILJS_PRIVATE_KEY,
-      }
-    );
-    
-    console.log('Notificación al restaurante enviada');
-  } catch (error) {
-    console.error('Error al enviar notificación:', error);
-    // No lanzar error aquí para no fallar la operación principal
-  }
+  await emailjs.send(
+    process.env.EMAILJS_SERVICE_ID,
+    process.env.EMAILJS_TEMPLATE_ID,
+    templateParams,
+    {
+      publicKey: process.env.EMAILJS_PUBLIC_KEY,
+      privateKey: process.env.EMAILJS_PRIVATE_KEY,
+    }
+  );
 }
