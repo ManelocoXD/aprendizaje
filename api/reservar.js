@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
 
   const { nombre, email, telefono, personas, hora, fecha } = req.body;
 
-  if (!nombre || email ||!telefono || !personas || !hora || !fecha) {
+  if (!nombre || !email || !telefono || !personas || !hora || !fecha) {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
