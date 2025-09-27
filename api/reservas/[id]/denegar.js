@@ -92,14 +92,30 @@ async function enviarEmailDenegacion(reserva) {
     const templateParams = {
       to_name: reserva.nombre,
       to_email: reserva.email,
-      subject: "Reserva no disponible",
-      message: `Hola ${reserva.nombre},\n\nLamentamos informarte que tu reserva para el ${fechaFormateada} a las ${reserva.hora} no ha podido ser confirmada debido a disponibilidad.\n\nTe invitamos a contactarnos para buscar una fecha alternativa.\n\n📞 Teléfono: ${process.env.RESTAURANT_PHONE || 'Contacta directamente'}\n\nGracias por tu comprensión.`,
+      subject: "Reserva no disponible ❌",
+      message: `Hola ${reserva.nombre},
+
+Lamentamos informarte que tu reserva no ha podido ser confirmada:
+
+📅 Fecha solicitada: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+
+MOTIVO: No hay disponibilidad para esa fecha y hora.
+
+¿Te interesa otra fecha? Contacta con nosotros:
+📞 Teléfono: ${process.env.RESTAURANT_PHONE || 'Contacta directamente al restaurante'}
+📧 Email: ${process.env.RESTAURANT_EMAIL}
+
+¡Esperamos poder atenderte pronto!
+
+Gracias por tu comprensión.`,
       reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
     };
 
     await emailjs.send(
       process.env.EMAILJS_SERVICE_ID,
-      process.env.EMAILJS_TEMPLATE_ID,
+      process.env.EMAILJS_TEMPLATE_ID, // Mismo template
       templateParams,
       {
         publicKey: process.env.EMAILJS_PUBLIC_KEY,
@@ -121,14 +137,28 @@ async function enviarNotificacionRestaurante(reserva, accion) {
     const templateParams = {
       to_name: "Equipo del Restaurante",
       to_email: process.env.RESTAURANT_EMAIL,
-      subject: "Reserva Denegada - Cliente contactado",
-      message: `Se ha denegado una reserva. Datos del cliente:\n\n👤 Cliente: ${reserva.nombre}\n📞 Teléfono: ${reserva.telefono}\n📅 Fecha solicitada: ${fechaFormateada}\n🕐 Hora: ${reserva.hora}\n👥 Personas: ${reserva.personas}\n\nSe recomienda contactar al cliente para ofrecer fechas alternativas.`,
+      subject: "Reserva Denegada ❌ - Cliente contactado",
+      message: `Se ha DENEGADO una reserva. Datos del cliente:
+
+👤 Cliente: ${reserva.nombre}
+📞 Teléfono: ${reserva.telefono}
+📧 Email: ${reserva.email || 'No proporcionado'}
+📅 Fecha solicitada: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+
+ACCIÓN RECOMENDADA:
+- Contactar al cliente para ofrecer fechas alternativas
+- Verificar si hay cancelaciones próximas para esa fecha
+- Ofrecer horarios alternativos cercanos
+
+El cliente ha sido informado de la denegación.`,
       reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
     };
 
     await emailjs.send(
       process.env.EMAILJS_SERVICE_ID,
-      process.env.EMAILJS_TEMPLATE_ID,
+      process.env.EMAILJS_TEMPLATE_ID, // Mismo template
       templateParams,
       {
         publicKey: process.env.EMAILJS_PUBLIC_KEY,
