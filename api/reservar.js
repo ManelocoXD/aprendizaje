@@ -18,7 +18,7 @@ module.exports = async (req, res) => {
 
   try {
     await db.execute(
-      "INSERT INTO reservas (nombre, email, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO reservas (nombre, email, telefono, personas, hora, fecha, estado) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [nombre, email, telefono, personas, hora, fecha, "pendiente"]
     );
     res.status(200).send("Reserva guardada");
