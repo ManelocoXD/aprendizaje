@@ -1,5 +1,5 @@
 const mysql = require("mysql2/promise");
-const twilio = require("twilio");
+const emailjs = require("@emailjs/nodejs");
 
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -10,8 +10,6 @@ const db = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0
 });
-
-const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 
 function formatearFecha(fechaStr) {
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -52,7 +50,7 @@ module.exports = async (req, res) => {
   try {
     console.log('Procesando denegación de reserva ID:', id);
     
-    // Primero obtener la reserva completa para enviar SMS
+    // Obtener la reserva completa antes de eliminarla
     const [reservas] = await db.query("SELECT * FROM reservas WHERE id = ?", [id]);
     
     if (reservas.length === 0) {
@@ -62,30 +60,11 @@ module.exports = async (req, res) => {
     const reserva = reservas[0];
     console.log('Reserva encontrada para denegar:', reserva);
 
-    // Enviar SMS de denegación antes de eliminar
-    if (reserva.telefono) {
-      const fechaFormateada = formatearFecha(reserva.fecha);
-      const mensaje = `Hola ${reserva.nombre}, lamentamos informarte que tu reserva para el ${fechaFormateada} a las ${reserva.hora} no ha podido ser confirmada.`;
-      
-      // Asegurar formato correcto del teléfono
-      let telefonoCompleto = reserva.telefono.toString();
-      if (!telefonoCompleto.startsWith('+')) {
-        telefonoCompleto = '+34' + telefonoCompleto.replace(/^0+/, '');
-      }
-      
-      console.log('Enviando SMS de denegación a:', telefonoCompleto);
-      
-      try {
-        const message = await client.messages.create({
-          body: mensaje,
-          from: process.env.TWILIO_FROM,
-          to: telefonoCompleto,
-        });
-        console.log('SMS de denegación enviado:', message.sid);
-      } catch (smsError) {
-        console.error('Error al enviar SMS de denegación:', smsError);
-        // Continuamos con la eliminación aunque falle el SMS
-      }
+    // Enviar email/notificación antes de eliminar
+    if (reserva.email) {
+      await enviarEmailDenegacion(reserva);
+    } else {
+      await enviarNotificacionRestaurante(reserva, 'denegada');
     }
     
     // Eliminar la reserva
@@ -105,3 +84,60 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+async function enviarEmailDenegacion(reserva) {
+  try {
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    
+    const templateParams = {
+      to_name: reserva.nombre,
+      to_email: reserva.email,
+      subject: "Reserva no disponible",
+      message: `Hola ${reserva.nombre},\n\nLamentamos informarte que tu reserva para el ${fechaFormateada} a las ${reserva.hora} no ha podido ser confirmada debido a disponibilidad.\n\nTe invitamos a contactarnos para buscar una fecha alternativa.\n\n📞 Teléfono: ${process.env.RESTAURANT_PHONE || 'Contacta directamente'}\n\nGracias por tu comprensión.`,
+      reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
+    };
+
+    await emailjs.send(
+      process.env.EMAILJS_SERVICE_ID,
+      process.env.EMAILJS_TEMPLATE_ID,
+      templateParams,
+      {
+        publicKey: process.env.EMAILJS_PUBLIC_KEY,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY,
+      }
+    );
+    
+    console.log('Email de denegación enviado exitosamente');
+  } catch (error) {
+    console.error('Error al enviar email de denegación:', error);
+    throw error;
+  }
+}
+
+async function enviarNotificacionRestaurante(reserva, accion) {
+  try {
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    
+    const templateParams = {
+      to_name: "Equipo del Restaurante",
+      to_email: process.env.RESTAURANT_EMAIL,
+      subject: "Reserva Denegada - Cliente contactado",
+      message: `Se ha denegado una reserva. Datos del cliente:\n\n👤 Cliente: ${reserva.nombre}\n📞 Teléfono: ${reserva.telefono}\n📅 Fecha solicitada: ${fechaFormateada}\n🕐 Hora: ${reserva.hora}\n👥 Personas: ${reserva.personas}\n\nSe recomienda contactar al cliente para ofrecer fechas alternativas.`,
+      reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
+    };
+
+    await emailjs.send(
+      process.env.EMAILJS_SERVICE_ID,
+      process.env.EMAILJS_TEMPLATE_ID,
+      templateParams,
+      {
+        publicKey: process.env.EMAILJS_PUBLIC_KEY,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY,
+      }
+    );
+    
+    console.log('Notificación de denegación enviada');
+  } catch (error) {
+    console.error('Error al enviar notificación:', error);
+  }
+}

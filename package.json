@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "mysql2": "^3.14.1",
-    "twilio": "^4.0.0"
+    "@emailjs/nodejs": "^4.0.0",
+    "mysql2": "^3.14.1"
   }
 }

@@ -1,5 +1,5 @@
 const mysql = require("mysql2/promise");
-const twilio = require("twilio");
+const emailjs = require("@emailjs/nodejs");
 
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -10,8 +10,6 @@ const db = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0
 });
-
-const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
 
 function formatearFecha(fechaStr) {
   const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -52,7 +50,7 @@ module.exports = async (req, res) => {
   try {
     console.log('Procesando confirmación de reserva ID:', id);
     
-    // Primero obtener la reserva completa
+    // Obtener la reserva completa
     const [reservas] = await db.query("SELECT * FROM reservas WHERE id = ?", [id]);
     
     if (reservas.length === 0) {
@@ -66,45 +64,18 @@ module.exports = async (req, res) => {
     await db.execute("UPDATE reservas SET estado = 'confirmada' WHERE id = ?", [id]);
     console.log('Estado actualizado a confirmada');
 
-    // Enviar SMS de confirmación
-    if (reserva.telefono) {
-      const fechaFormateada = formatearFecha(reserva.fecha);
-      const mensaje = `Hola ${reserva.nombre}, tu reserva para el ${fechaFormateada} a las ${reserva.hora} ha sido confirmada. ¡Te esperamos!`;
-      
-      // Asegurar formato correcto del teléfono
-      let telefonoCompleto = reserva.telefono.toString();
-      if (!telefonoCompleto.startsWith('+')) {
-        // Eliminar ceros iniciales y agregar +34
-        telefonoCompleto = '+34' + telefonoCompleto.replace(/^0+/, '');
-      }
-      
-      console.log('Enviando SMS a:', telefonoCompleto);
-      
-      try {
-        const message = await client.messages.create({
-          body: mensaje,
-          from: process.env.TWILIO_FROM,
-          to: telefonoCompleto,
-        });
-        console.log('SMS enviado exitosamente:', message.sid);
-        res.status(200).json({ 
-          success: true, 
-          message: "Reserva confirmada y SMS enviado",
-          messageSid: message.sid 
-        });
-      } catch (smsError) {
-        console.error('Error al enviar SMS:', smsError);
-        res.status(200).json({ 
-          success: true, 
-          message: "Reserva confirmada pero error al enviar SMS: " + smsError.message 
-        });
-      }
+    // Enviar email de confirmación si hay email, si no hay, enviar notificación al restaurante
+    if (reserva.email) {
+      await enviarEmailConfirmacion(reserva);
     } else {
-      res.status(200).json({ 
-        success: true, 
-        message: "Reserva confirmada (sin teléfono para SMS)" 
-      });
+      // Enviar notificación al restaurante con datos de contacto
+      await enviarNotificacionRestaurante(reserva, 'confirmada');
     }
+    
+    res.status(200).json({ 
+      success: true, 
+      message: "Reserva confirmada y notificación enviada"
+    });
     
   } catch (err) {
     console.error("Error al confirmar reserva:", err);
@@ -114,3 +85,83 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+async function enviarEmailConfirmacion(reserva) {
+  try {
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    
+    const templateParams = {
+      to_name: reserva.nombre,
+      to_email: reserva.email,
+      subject: "Reserva Confirmada ✅",
+      message: `¡Hola ${reserva.nombre}!
+
+Tu reserva ha sido CONFIRMADA:
+
+📅 Fecha: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+📞 Teléfono: ${reserva.telefono}
+
+¡Te esperamos! Gracias por elegirnos.
+
+Si necesitas modificar algo, contacta con nosotros.`,
+      reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
+    };
+
+    await emailjs.send(
+      process.env.EMAILJS_SERVICE_ID,
+      process.env.EMAILJS_TEMPLATE_ID, // Solo un template
+      templateParams,
+      {
+        publicKey: process.env.EMAILJS_PUBLIC_KEY,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY,
+      }
+    );
+    
+    console.log('Email de confirmación enviado exitosamente');
+  } catch (error) {
+    console.error('Error al enviar email de confirmación:', error);
+    throw error;
+  }
+}
+
+async function enviarNotificacionRestaurante(reserva, accion) {
+  try {
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    const asunto = accion === 'confirmada' ? 'Reserva Confirmada ✅' : 'Reserva Denegada ❌';
+    
+    const templateParams = {
+      to_name: "Equipo del Restaurante",
+      to_email: process.env.RESTAURANT_EMAIL,
+      subject: `${asunto} - Contactar cliente`,
+      message: `Se ha ${accion} una reserva. Datos del cliente para contactar:
+
+👤 Cliente: ${reserva.nombre}
+📞 Teléfono: ${reserva.telefono}
+📅 Fecha: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+
+${accion === 'confirmada' ? 
+  'ACCIÓN: Contacta al cliente para confirmar los detalles finales.' : 
+  'ACCIÓN: Se ha informado al cliente. Considera ofrecer fechas alternativas.'}`,
+      reply_to: process.env.RESTAURANT_EMAIL || "noreply@restaurant.com"
+    };
+
+    await emailjs.send(
+      process.env.EMAILJS_SERVICE_ID,
+      process.env.EMAILJS_TEMPLATE_ID, // Mismo template
+      templateParams,
+      {
+        publicKey: process.env.EMAILJS_PUBLIC_KEY,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY,
+      }
+    );
+    
+    console.log('Notificación al restaurante enviada');
+  } catch (error) {
+    console.error('Error al enviar notificación:', error);
+    // No lanzar error aquí para no fallar la operación principal
+  }
+}
