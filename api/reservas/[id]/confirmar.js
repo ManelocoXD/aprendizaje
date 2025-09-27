@@ -1,5 +1,5 @@
+// api/reservas/[id]/confirmar.js - NUEVA VERSIÓN
 const { createClient } = require('@supabase/supabase-js');
-const emailjs = require("@emailjs/nodejs");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -64,23 +64,45 @@ module.exports = async (req, res) => {
 
     console.log('Estado actualizado a confirmada');
 
-    // Enviar email
-    try {
-      if (reserva.email) {
-        await enviarEmailConfirmacion(reserva);
-        console.log('Email de confirmación enviado al cliente');
-      } else {
-        await enviarNotificacionRestaurante(reserva, 'confirmada');
-        console.log('Notificación enviada al restaurante');
+    // En lugar de enviar el email aquí, devolvemos los datos para que el frontend envíe el email
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    
+    const emailData = {
+      shouldSendEmail: true,
+      emailType: reserva.email ? 'cliente' : 'restaurante',
+      emailParams: {
+        to_name: reserva.email ? reserva.nombre : "Equipo del Restaurante",
+        to_email: reserva.email || process.env.RESTAURANT_EMAIL,
+        subject: reserva.email ? "Reserva Confirmada ✅" : "Reserva Confirmada ✅ - Contactar cliente",
+        message: reserva.email ? 
+          `¡Hola ${reserva.nombre}!
+
+Tu reserva ha sido CONFIRMADA:
+
+📅 Fecha: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+📞 Teléfono: ${reserva.telefono}
+
+¡Te esperamos! Gracias por elegirnos.` :
+          `Se ha confirmado una reserva. Datos del cliente para contactar:
+
+👤 Cliente: ${reserva.nombre}
+📞 Teléfono: ${reserva.telefono}
+📧 Email: ${reserva.email || 'No proporcionado'}
+📅 Fecha: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+
+ACCIÓN: Contacta al cliente para confirmar los detalles finales.`,
+        reply_to: process.env.RESTAURANT_EMAIL
       }
-    } catch (emailError) {
-      console.error('Error al enviar email:', emailError);
-      // No fallar la operación si el email falla
-    }
+    };
     
     res.status(200).json({ 
       success: true, 
-      message: "Reserva confirmada y notificación enviada"
+      message: "Reserva confirmada",
+      emailData: emailData
     });
     
   } catch (err) {
@@ -91,67 +113,3 @@ module.exports = async (req, res) => {
     });
   }
 };
-
-async function enviarEmailConfirmacion(reserva) {
-  const fechaFormateada = formatearFecha(reserva.fecha);
-  
-  const templateParams = {
-    to_name: reserva.nombre,
-    to_email: reserva.email,
-    subject: "Reserva Confirmada ✅",
-    message: `¡Hola ${reserva.nombre}!
-
-Tu reserva ha sido CONFIRMADA:
-
-📅 Fecha: ${fechaFormateada}
-🕐 Hora: ${reserva.hora}
-👥 Personas: ${reserva.personas}
-📞 Teléfono: ${reserva.telefono}
-
-¡Te esperamos! Gracias por elegirnos.
-
-Si necesitas modificar algo, contacta con nosotros.`,
-    reply_to: process.env.RESTAURANT_EMAIL
-  };
-
-  await emailjs.send(
-    process.env.EMAILJS_SERVICE_ID,
-    process.env.EMAILJS_TEMPLATE_ID,
-    templateParams,
-    {
-      publicKey: process.env.EMAILJS_PUBLIC_KEY,
-      privateKey: process.env.EMAILJS_PRIVATE_KEY,
-    }
-  );
-}
-
-async function enviarNotificacionRestaurante(reserva, accion) {
-  const fechaFormateada = formatearFecha(reserva.fecha);
-  
-  const templateParams = {
-    to_name: "Equipo del Restaurante",
-    to_email: process.env.RESTAURANT_EMAIL,
-    subject: "Reserva Confirmada ✅ - Contactar cliente",
-    message: `Se ha confirmado una reserva. Datos del cliente para contactar:
-
-👤 Cliente: ${reserva.nombre}
-📞 Teléfono: ${reserva.telefono}
-📧 Email: ${reserva.email || 'No proporcionado'}
-📅 Fecha: ${fechaFormateada}
-🕐 Hora: ${reserva.hora}
-👥 Personas: ${reserva.personas}
-
-ACCIÓN: Contacta al cliente para confirmar los detalles finales.`,
-    reply_to: process.env.RESTAURANT_EMAIL
-  };
-
-  await emailjs.send(
-    process.env.EMAILJS_SERVICE_ID,
-    process.env.EMAILJS_TEMPLATE_ID,
-    templateParams,
-    {
-      publicKey: process.env.EMAILJS_PUBLIC_KEY,
-      privateKey: process.env.EMAILJS_PRIVATE_KEY,
-    }
-  );
-}

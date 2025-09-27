@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const emailjs = require("@emailjs/nodejs");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -51,19 +50,52 @@ module.exports = async (req, res) => {
 
     console.log('Reserva encontrada para denegar:', reserva);
 
-    // Enviar email/notificación antes de eliminar
-    try {
-      if (reserva.email) {
-        await enviarEmailDenegacion(reserva);
-        console.log('Email de denegación enviado al cliente');
-      } else {
-        await enviarNotificacionRestaurante(reserva, 'denegada');
-        console.log('Notificación de denegación enviada al restaurante');
+    // Preparar datos del email antes de eliminar
+    const fechaFormateada = formatearFecha(reserva.fecha);
+    
+    const emailData = {
+      shouldSendEmail: true,
+      emailType: reserva.email ? 'cliente' : 'restaurante',
+      emailParams: {
+        to_name: reserva.email ? reserva.nombre : "Equipo del Restaurante",
+        to_email: reserva.email || process.env.RESTAURANT_EMAIL,
+        subject: reserva.email ? "Reserva no disponible ❌" : "Reserva Denegada ❌ - Cliente contactado",
+        message: reserva.email ? 
+          `Hola ${reserva.nombre},
+
+Lamentamos informarte que tu reserva no ha podido ser confirmada:
+
+📅 Fecha solicitada: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+
+MOTIVO: No hay disponibilidad para esa fecha y hora.
+
+¿Te interesa otra fecha? Contacta con nosotros:
+📞 Teléfono: ${process.env.RESTAURANT_PHONE}
+📧 Email: ${process.env.RESTAURANT_EMAIL}
+
+¡Esperamos poder atenderte pronto!
+
+Gracias por tu comprensión.` :
+          `Se ha DENEGADO una reserva. Datos del cliente:
+
+👤 Cliente: ${reserva.nombre}
+📞 Teléfono: ${reserva.telefono}
+📧 Email: ${reserva.email || 'No proporcionado'}
+📅 Fecha solicitada: ${fechaFormateada}
+🕐 Hora: ${reserva.hora}
+👥 Personas: ${reserva.personas}
+
+ACCIÓN RECOMENDADA:
+- Contactar al cliente para ofrecer fechas alternativas
+- Verificar si hay cancelaciones próximas para esa fecha
+- Ofrecer horarios alternativos cercanos
+
+El cliente ha sido informado de la denegación.`,
+        reply_to: process.env.RESTAURANT_EMAIL
       }
-    } catch (emailError) {
-      console.error('Error al enviar email:', emailError);
-      // Continuar con la eliminación aunque falle el email
-    }
+    };
     
     // Eliminar la reserva
     const { error: deleteError } = await supabase
@@ -80,7 +112,8 @@ module.exports = async (req, res) => {
     
     res.status(200).json({ 
       success: true, 
-      message: "Reserva denegada y eliminada exitosamente" 
+      message: "Reserva denegada y eliminada",
+      emailData: emailData
     });
     
   } catch (err) {
@@ -91,77 +124,3 @@ module.exports = async (req, res) => {
     });
   }
 };
-
-async function enviarEmailDenegacion(reserva) {
-  const fechaFormateada = formatearFecha(reserva.fecha);
-  
-  const templateParams = {
-    to_name: reserva.nombre,
-    to_email: reserva.email,
-    subject: "Reserva no disponible ❌",
-    message: `Hola ${reserva.nombre},
-
-Lamentamos informarte que tu reserva no ha podido ser confirmada:
-
-📅 Fecha solicitada: ${fechaFormateada}
-🕐 Hora: ${reserva.hora}
-👥 Personas: ${reserva.personas}
-
-MOTIVO: No hay disponibilidad para esa fecha y hora.
-
-¿Te interesa otra fecha? Contacta con nosotros:
-📞 Teléfono: ${process.env.RESTAURANT_PHONE}
-📧 Email: ${process.env.RESTAURANT_EMAIL}
-
-¡Esperamos poder atenderte pronto!
-
-Gracias por tu comprensión.`,
-    reply_to: process.env.RESTAURANT_EMAIL
-  };
-
-  await emailjs.send(
-    process.env.EMAILJS_SERVICE_ID,
-    process.env.EMAILJS_TEMPLATE_ID,
-    templateParams,
-    {
-      publicKey: process.env.EMAILJS_PUBLIC_KEY,
-      privateKey: process.env.EMAILJS_PRIVATE_KEY,
-    }
-  );
-}
-
-async function enviarNotificacionRestaurante(reserva, accion) {
-  const fechaFormateada = formatearFecha(reserva.fecha);
-  
-  const templateParams = {
-    to_name: "Equipo del Restaurante",
-    to_email: process.env.RESTAURANT_EMAIL,
-    subject: "Reserva Denegada ❌ - Cliente contactado",
-    message: `Se ha DENEGADO una reserva. Datos del cliente:
-
-👤 Cliente: ${reserva.nombre}
-📞 Teléfono: ${reserva.telefono}
-📧 Email: ${reserva.email || 'No proporcionado'}
-📅 Fecha solicitada: ${fechaFormateada}
-🕐 Hora: ${reserva.hora}
-👥 Personas: ${reserva.personas}
-
-ACCIÓN RECOMENDADA:
-- Contactar al cliente para ofrecer fechas alternativas
-- Verificar si hay cancelaciones próximas para esa fecha
-- Ofrecer horarios alternativos cercanos
-
-El cliente ha sido informado de la denegación.`,
-    reply_to: process.env.RESTAURANT_EMAIL
-  };
-
-  await emailjs.send(
-    process.env.EMAILJS_SERVICE_ID,
-    process.env.EMAILJS_TEMPLATE_ID,
-    templateParams,
-    {
-      publicKey: process.env.EMAILJS_PUBLIC_KEY,
-      privateKey: process.env.EMAILJS_PRIVATE_KEY,
-    }
-  );
-}
