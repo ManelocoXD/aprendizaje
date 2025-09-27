@@ -3,15 +3,34 @@ const emailjs = require("@emailjs/nodejs");
 module.exports = async (req, res) => {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
   
+  // Permitir GET para verificar configuración
+  if (req.method === "GET") {
+    const envCheck = {
+      EMAILJS_SERVICE_ID: !!process.env.EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID: !!process.env.EMAILJS_TEMPLATE_ID,
+      EMAILJS_PUBLIC_KEY: !!process.env.EMAILJS_PUBLIC_KEY,
+      EMAILJS_PRIVATE_KEY: !!process.env.EMAILJS_PRIVATE_KEY,
+      RESTAURANT_EMAIL: !!process.env.RESTAURANT_EMAIL,
+      RESTAURANT_PHONE: !!process.env.RESTAURANT_PHONE
+    };
+
+    return res.status(200).json({
+      message: "Estado de configuración EmailJS",
+      environment: envCheck,
+      allConfigured: Object.values(envCheck).every(Boolean),
+      instructions: "Envía un POST con { email: 'test@example.com', tipo: 'general' } para probar"
+    });
+  }
+  
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método no permitido" });
+    return res.status(405).json({ error: "Método no permitido. Usa GET para verificar o POST para enviar." });
   }
 
   const { email, tipo } = req.body;
