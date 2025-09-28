@@ -679,3 +679,503 @@
           <div class="summary-item">
             <span class="summary-label">Personas:</span>
             <span class="summary-value" id="summaryPeople"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Fecha:</span>
+            <span class="summary-value" id="summaryDate"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Hora:</span>
+            <span class="summary-value" id="summaryTime"></span>
+          </div>
+        </div>
+
+        <div class="navigation">
+          <button class="btn btn-secondary" onclick="previousStep()">
+            ← Atrás
+          </button>
+          <button class="btn btn-primary" onclick="submitReservation()" disabled id="submitBtn">
+            🎉 Confirmar Reserva
+          </button>
+        </div>
+      </div>
+
+      <!-- PASO 4: Confirmación -->
+      <div class="step-content" id="step4">
+        <div class="success-message">
+          <span class="emoji">🎉</span>
+          <h3>¡Reserva enviada exitosamente!</h3>
+          <p>Hemos recibido tu solicitud de reserva. Te contactaremos pronto para confirmarla.</p>
+          <div style="margin-top: 30px;">
+            <button class="btn btn-primary" onclick="location.reload()">
+              Hacer otra reserva
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="step-content" id="loading">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>Procesando tu reserva...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Variables globales
+    let currentStep = 1;
+    let selectedPeople = null;
+    let selectedDate = null;
+    let selectedTime = null;
+    let currentMonth = new Date();
+    let availabilityData = {};
+
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', function() {
+      initializePeopleSelector();
+      loadCalendar();
+    });
+
+    // Inicializar selector de personas
+    function initializePeopleSelector() {
+      const peopleButtons = document.querySelectorAll('.people-btn');
+      peopleButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+          // Remover selección anterior
+          peopleButtons.forEach(b => b.classList.remove('selected'));
+          
+          // Seleccionar actual
+          this.classList.add('selected');
+          selectedPeople = parseInt(this.dataset.people);
+          
+          // Limpiar error
+          hideError('personasError');
+          
+          console.log('Personas seleccionadas:', selectedPeople);
+        });
+      });
+    }
+
+    // Navegación entre pasos
+    function nextStep() {
+      if (validateCurrentStep()) {
+        if (currentStep === 1) {
+          updateSummary();
+          loadCalendar();
+        } else if (currentStep === 2) {
+          loadTimeSlots();
+        }
+        
+        currentStep++;
+        updateStepDisplay();
+        updateProgressBar();
+      }
+    }
+
+    function previousStep() {
+      if (currentStep > 1) {
+        currentStep--;
+        updateStepDisplay();
+        updateProgressBar();
+      }
+    }
+
+    // Validar paso actual
+    function validateCurrentStep() {
+      switch(currentStep) {
+        case 1:
+          return validateStep1();
+        case 2:
+          return validateStep2();
+        case 3:
+          return validateStep3();
+        default:
+          return true;
+      }
+    }
+
+    function validateStep1() {
+      let isValid = true;
+      
+      const nombre = document.getElementById('nombre').value.trim();
+      if (!nombre) {
+        showError('nombreError', 'Por favor, ingresa tu nombre completo');
+        isValid = false;
+      } else {
+        hideError('nombreError');
+      }
+
+      const email = document.getElementById('email').value.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        showError('emailError', 'Por favor, ingresa un email válido');
+        isValid = false;
+      } else {
+        hideError('emailError');
+      }
+
+      const telefono = document.getElementById('telefono').value.trim();
+      if (!telefono) {
+        showError('telefonoError', 'Por favor, ingresa tu número de teléfono');
+        isValid = false;
+      } else {
+        hideError('telefonoError');
+      }
+
+      if (!selectedPeople) {
+        showError('personasError', 'Por favor, selecciona el número de personas');
+        isValid = false;
+      } else {
+        hideError('personasError');
+      }
+
+      return isValid;
+    }
+
+    function validateStep2() {
+      if (!selectedDate) {
+        showError('fechaError', 'Por favor, selecciona una fecha disponible');
+        return false;
+      }
+      hideError('fechaError');
+      return true;
+    }
+
+    function validateStep3() {
+      if (!selectedTime) {
+        showError('horaError', 'Por favor, selecciona una hora');
+        return false;
+      }
+      hideError('horaError');
+      return true;
+    }
+
+    // Mostrar/ocultar errores
+    function showError(elementId, message) {
+      const errorElement = document.getElementById(elementId);
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+    }
+
+    function hideError(elementId) {
+      const errorElement = document.getElementById(elementId);
+      errorElement.style.display = 'none';
+    }
+
+    // Actualizar display de pasos
+    function updateStepDisplay() {
+      // Ocultar todos los pasos
+      document.querySelectorAll('.step-content').forEach(step => {
+        step.classList.remove('active');
+      });
+
+      // Mostrar paso actual
+      document.getElementById(`step${currentStep}`).classList.add('active');
+
+      // Actualizar indicadores
+      for (let i = 1; i <= 3; i++) {
+        const indicator = document.getElementById(`step${i}Indicator`);
+        indicator.classList.remove('active', 'completed');
+        
+        if (i === currentStep) {
+          indicator.classList.add('active');
+        } else if (i < currentStep) {
+          indicator.classList.add('completed');
+        }
+      }
+    }
+
+    // Actualizar barra de progreso
+    function updateProgressBar() {
+      const progressBar = document.getElementById('progressBar');
+      const progress = (currentStep / 3) * 100;
+      progressBar.style.width = `${progress}%`;
+    }
+
+    // Cargar calendario
+    async function loadCalendar() {
+      try {
+        console.log('Cargando calendario...');
+        
+        const response = await fetch('/api/disponibilidad');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        availabilityData = data;
+        
+        renderCalendar();
+      } catch (error) {
+        console.error('Error cargando disponibilidad:', error);
+        alert('Error al cargar la disponibilidad del calendario');
+      }
+    }
+
+    // Renderizar calendario
+    function renderCalendar() {
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      
+      document.getElementById('monthTitle').textContent = 
+        `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+
+      const dateGrid = document.getElementById('dateGrid');
+      
+      // Limpiar grid (mantener headers)
+      const headers = dateGrid.querySelectorAll('.date-header');
+      dateGrid.innerHTML = '';
+      headers.forEach(header => dateGrid.appendChild(header));
+
+      // Calcular primer día del mes
+      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const startDate = firstDay.getDay(); // 0 = Domingo
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Espacios vacíos al inicio
+      for (let i = 0; i < startDate; i++) {
+        const emptyDiv = document.createElement('div');
+        dateGrid.appendChild(emptyDiv);
+      }
+
+      // Días del mes
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        const dateString = date.toISOString().split('T')[0];
+        
+        const dateBtn = document.createElement('div');
+        dateBtn.className = 'date-btn';
+        dateBtn.textContent = day;
+        
+        // Determinar estado del día
+        if (date < today) {
+          dateBtn.classList.add('disabled');
+        } else if (date.toDateString() === today.toDateString()) {
+          dateBtn.classList.add('today');
+        }
+
+        // Verificar disponibilidad
+        const availability = availabilityData.availability && availabilityData.availability[dateString];
+        if (availability) {
+          if (availability.available) {
+            dateBtn.classList.add('available');
+          } else {
+            dateBtn.classList.add('unavailable');
+          }
+        }
+
+        // Event listener para selección
+        if (!dateBtn.classList.contains('disabled') && !dateBtn.classList.contains('unavailable')) {
+          dateBtn.addEventListener('click', function() {
+            // Remover selección anterior
+            document.querySelectorAll('.date-btn').forEach(btn => {
+              btn.classList.remove('selected');
+            });
+            
+            // Seleccionar actual
+            this.classList.add('selected');
+            selectedDate = dateString;
+            
+            // Habilitar botón siguiente
+            document.getElementById('dateNextBtn').disabled = false;
+            hideError('fechaError');
+            
+            console.log('Fecha seleccionada:', selectedDate);
+          });
+        }
+
+        dateGrid.appendChild(dateBtn);
+      }
+    }
+
+    // Navegación de meses
+    function previousMonth() {
+      const newMonth = new Date(currentMonth);
+      newMonth.setMonth(currentMonth.getMonth() - 1);
+      
+      // No permitir meses anteriores al actual
+      const today = new Date();
+      if (newMonth.getFullYear() > today.getFullYear() || 
+          (newMonth.getFullYear() === today.getFullYear() && newMonth.getMonth() >= today.getMonth())) {
+        currentMonth = newMonth;
+        renderCalendar();
+      }
+    }
+
+    function nextMonth() {
+      const newMonth = new Date(currentMonth);
+      newMonth.setMonth(currentMonth.getMonth() + 1);
+      
+      // Limitar a 3 meses en el futuro
+      const maxMonth = new Date();
+      maxMonth.setMonth(maxMonth.getMonth() + 3);
+      
+      if (newMonth <= maxMonth) {
+        currentMonth = newMonth;
+        renderCalendar();
+      }
+    }
+
+    // Cargar horarios disponibles
+    async function loadTimeSlots() {
+      try {
+        console.log(`Cargando horarios para ${selectedDate} con ${selectedPeople} personas`);
+        
+        const response = await fetch(`/api/disponibilidad?fecha=${selectedDate}&personas=${selectedPeople}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        renderTimeSlots(data);
+        
+        // Actualizar información de fecha seleccionada
+        const dateObj = new Date(selectedDate + 'T00:00:00');
+        const options = { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        };
+        document.getElementById('selectedDateDisplay').textContent = 
+          dateObj.toLocaleDateString('es-ES', options);
+        
+      } catch (error) {
+        console.error('Error cargando horarios:', error);
+        alert('Error al cargar los horarios disponibles');
+      }
+    }
+
+    // Renderizar horarios
+    function renderTimeSlots(availability) {
+      const timeGrid = document.getElementById('timeGrid');
+      timeGrid.innerHTML = '';
+
+      if (!availability.available || availability.availableSlots.length === 0) {
+        timeGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: #999;">No hay horarios disponibles para esta fecha</div>';
+        return;
+      }
+
+      availability.availableSlots.forEach(slot => {
+        const timeBtn = document.createElement('div');
+        timeBtn.className = 'time-btn';
+        timeBtn.innerHTML = `
+          <div>${slot.time}</div>
+          <div class="capacity">${slot.availableSpaces} espacios</div>
+        `;
+
+        timeBtn.addEventListener('click', function() {
+          // Remover selección anterior
+          document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.classList.remove('selected');
+          });
+          
+          // Seleccionar actual
+          this.classList.add('selected');
+          selectedTime = slot.time;
+          
+          // Habilitar botón enviar
+          document.getElementById('submitBtn').disabled = false;
+          hideError('horaError');
+          
+          // Actualizar resumen
+          updateSummary();
+          
+          console.log('Hora seleccionada:', selectedTime);
+        });
+
+        timeGrid.appendChild(timeBtn);
+      });
+    }
+
+    // Actualizar resumen
+    function updateSummary() {
+      document.getElementById('summaryName').textContent = document.getElementById('nombre').value;
+      document.getElementById('summaryEmail').textContent = document.getElementById('email').value;
+      document.getElementById('summaryPhone').textContent = document.getElementById('telefono').value;
+      document.getElementById('summaryPeople').textContent = selectedPeople || '-';
+      
+      if (selectedDate) {
+        const dateObj = new Date(selectedDate + 'T00:00:00');
+        const options = { 
+          weekday: 'long', 
+          day: 'numeric', 
+          month: 'long' 
+        };
+        document.getElementById('summaryDate').textContent = 
+          dateObj.toLocaleDateString('es-ES', options);
+      }
+      
+      document.getElementById('summaryTime').textContent = selectedTime || '-';
+    }
+
+    // Enviar reserva
+    async function submitReservation() {
+      try {
+        // Mostrar loading
+        document.getElementById('step3').classList.remove('active');
+        document.getElementById('loading').classList.add('active');
+
+        const reservationData = {
+          nombre: document.getElementById('nombre').value.trim(),
+          email: document.getElementById('email').value.trim(),
+          telefono: document.getElementById('telefono').value.trim(),
+          personas: selectedPeople,
+          fecha: selectedDate,
+          hora: selectedTime
+        };
+
+        console.log('Enviando reserva:', reservationData);
+
+        const response = await fetch('/api/reservar', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(reservationData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al enviar la reserva');
+        }
+
+        const result = await response.json();
+        console.log('Reserva enviada exitosamente:', result);
+
+        // Mostrar confirmación
+        setTimeout(() => {
+          document.getElementById('loading').classList.remove('active');
+          document.getElementById('step4').classList.add('active');
+        }, 2000);
+
+      } catch (error) {
+        console.error('Error enviando reserva:', error);
+        
+        // Volver al paso 3
+        document.getElementById('loading').classList.remove('active');
+        document.getElementById('step3').classList.add('active');
+        
+        alert('Error al enviar la reserva: ' + error.message);
+      }
+    }
+
+    // Formatear fecha para display
+    function formatDate(dateString) {
+      const date = new Date(dateString + 'T00:00:00');
+      const options = { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      };
+      return date.toLocaleDateString('es-ES', options);
+    }
+  </script>
+</body>
+</html>
