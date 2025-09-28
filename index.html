@@ -609,13 +609,13 @@
           
           <div class="date-grid" id="dateGrid">
             <!-- Headers de días -->
-            <div class="date-header">Dom</div>
             <div class="date-header">Lun</div>
             <div class="date-header">Mar</div>
             <div class="date-header">Mié</div>
             <div class="date-header">Jue</div>
             <div class="date-header">Vie</div>
             <div class="date-header">Sáb</div>
+            <div class="date-header">Dom</div>
           </div>
           
           <div class="availability-info">
@@ -705,7 +705,7 @@
         <div class="success-message">
           <span class="emoji">🎉</span>
           <h3>¡Reserva enviada exitosamente!</h3>
-          <p>Hemos recibido tu solicitud de reserva. Te contactaremos pronto para confirmarla.</p>
+          <p>Reserva realizada correctamente</p>
           <div style="margin-top: 30px;">
             <button class="btn btn-primary" onclick="location.reload()">
               Hacer otra reserva
@@ -943,10 +943,10 @@
           const dayOfWeek = date.getDay();
           
           fallbackData.availability[dateString] = {
-            available: dayOfWeek !== 0, // No disponible los domingos
-            reason: dayOfWeek === 0 ? 'Restaurante cerrado' : null,
+            available: dayOfWeek !== 6, // No disponible los domingos
+            reason: dayOfWeek === 6 ? 'Restaurante cerrado' : null,
             slotsCount: dayOfWeek !== 0 ? 8 : 0,
-            dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dayOfWeek]
+            dayOfWeek: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][dayOfWeek]
           };
         }
         

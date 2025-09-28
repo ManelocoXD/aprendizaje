@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Lista de Reservas Confirmadas</title>
+  <title>Gestión de Reservas</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -13,7 +13,7 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       background: white;
       border-radius: 15px;
@@ -40,13 +40,135 @@
       font-size: 1.1em;
     }
 
-    .stats {
+    .controls-section {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: 300px 1fr;
       gap: 20px;
       padding: 30px;
       background: #f8f9fa;
       border-bottom: 1px solid #e9ecef;
+    }
+
+    .calendar-container {
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .calendar-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .calendar-nav-btn {
+      background: none;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .calendar-nav-btn:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+    }
+
+    .calendar-day-header {
+      text-align: center;
+      font-weight: 600;
+      color: #666;
+      padding: 10px 5px;
+      font-size: 12px;
+    }
+
+    .calendar-day {
+      aspect-ratio: 1;
+      border: 1px solid #e9ecef;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      position: relative;
+    }
+
+    .calendar-day:hover:not(.disabled):not(.empty) {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .calendar-day.selected {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+
+    .calendar-day.today {
+      border-color: #28a745;
+      color: #28a745;
+      font-weight: 600;
+    }
+
+    .calendar-day.disabled {
+      background: #f8f9fa;
+      color: #adb5bd;
+      cursor: not-allowed;
+    }
+
+    .calendar-day.empty {
+      border: none;
+      background: transparent;
+      cursor: default;
+    }
+
+    .calendar-day.has-reservations:after {
+      content: '';
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 6px;
+      height: 6px;
+      background: #dc3545;
+      border-radius: 50%;
+    }
+
+    .calendar-day.selected.has-reservations:after {
+      background: #fff;
+    }
+
+    .stats-filters {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
     }
 
     .stat-card {
@@ -58,38 +180,80 @@
     }
 
     .stat-number {
-      font-size: 2.5em;
+      font-size: 2em;
       font-weight: bold;
       color: #667eea;
-      margin-bottom: 10px;
+      margin-bottom: 5px;
     }
 
     .stat-label {
       color: #666;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
     }
 
-    .controls {
-      padding: 20px 30px;
-      background: #f8f9fa;
-      border-bottom: 1px solid #e9ecef;
+    .filters {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .filter-group {
+      margin-bottom: 15px;
+    }
+
+    .filter-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .filter-select {
+      width: 100%;
+      padding: 10px 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+    }
+
+    .filter-buttons {
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 15px;
+      gap: 10px;
+    }
+
+    .filter-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: 2px solid #e9ecef;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .filter-btn.active {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
     }
 
     .refresh-btn {
+      width: 100%;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border: none;
-      padding: 10px 20px;
+      padding: 12px 20px;
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
       transition: all 0.3s ease;
+      margin-top: 15px;
     }
 
     .refresh-btn:hover {
@@ -97,17 +261,19 @@
       box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
     }
 
-    .filter-select {
-      padding: 8px 15px;
-      border: 2px solid #e9ecef;
-      border-radius: 8px;
-      font-size: 14px;
-      background: white;
-    }
-
     .table-container {
       padding: 0 30px 30px 30px;
       overflow-x: auto;
+    }
+
+    .selected-date-info {
+      background: #e3f2fd;
+      border: 1px solid #bbdefb;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+      color: #1565c0;
+      font-weight: 600;
     }
 
     table {
@@ -178,6 +344,23 @@
       font-size: 13px;
     }
 
+    .cancel-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .cancel-btn:hover {
+      background: #c82333;
+      transform: translateY(-1px);
+    }
+
     .loading {
       text-align: center;
       padding: 60px;
@@ -211,41 +394,103 @@
       display: block;
     }
 
-    .auto-refresh {
-      color: #666;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .auto-refresh .dot {
-      width: 8px;
-      height: 8px;
-      background: #28a745;
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
-    }
-
     .created-date {
       color: #999;
       font-size: 12px;
     }
 
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-content {
+      background-color: white;
+      margin: 15% auto;
+      padding: 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 1.5em;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .close {
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #aaa;
+    }
+
+    .close:hover {
+      color: #000;
+    }
+
+    .modal-body {
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 15px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+    }
+
+    .btn-danger {
+      background: #dc3545;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c82333;
+    }
+
+    @media (max-width: 1024px) {
+      .controls-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
     @media (max-width: 768px) {
       .stats {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      
-      .controls {
-        flex-direction: column;
-        align-items: stretch;
+        grid-template-columns: 1fr;
       }
       
       table {
@@ -255,56 +500,97 @@
       th, td {
         padding: 10px 8px;
       }
+      
+      .contact-cell {
+        font-size: 11px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>📋 Reservas Confirmadas</h1>
-      <p>Sistema de gestión de reservas del restaurante</p>
+      <h1>🗓️ Gestión de Reservas</h1>
+      <p>Sistema completo de administración de reservas del restaurante</p>
     </div>
 
-    <div class="stats">
-      <div class="stat-card">
-        <div class="stat-number" id="totalReservas">-</div>
-        <div class="stat-label">Total Reservas</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number" id="reservasHoy">-</div>
-        <div class="stat-label">Reservas Hoy</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number" id="personasHoy">-</div>
-        <div class="stat-label">Personas Hoy</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number" id="proximasReservas">-</div>
-        <div class="stat-label">Próximas 7 días</div>
-      </div>
-    </div>
-
-    <div class="controls">
-      <div>
-        <select class="filter-select" id="filterSelect" onchange="filterReservations()">
-          <option value="todas">Todas las reservas</option>
-          <option value="hoy">Solo hoy</option>
-          <option value="manana">Solo mañana</option>
-          <option value="semana">Próximos 7 días</option>
-        </select>
-      </div>
-      <div style="display: flex; align-items: center; gap: 15px;">
-        <div class="auto-refresh">
-          <div class="dot"></div>
-          Actualización automática
+    <div class="controls-section">
+      <!-- Calendario -->
+      <div class="calendar-container">
+        <div class="calendar-header">
+          <button class="calendar-nav-btn" onclick="previousMonth()">‹</button>
+          <div class="calendar-title" id="calendarTitle"></div>
+          <button class="calendar-nav-btn" onclick="nextMonth()">›</button>
         </div>
-        <button class="refresh-btn" onclick="cargarReservas()">
-          🔄 Actualizar
-        </button>
+        
+        <div class="calendar-grid" id="calendarGrid">
+          <!-- Headers de días -->
+          <div class="calendar-day-header">Dom</div>
+          <div class="calendar-day-header">Lun</div>
+          <div class="calendar-day-header">Mar</div>
+          <div class="calendar-day-header">Mié</div>
+          <div class="calendar-day-header">Jue</div>
+          <div class="calendar-day-header">Vie</div>
+          <div class="calendar-day-header">Sáb</div>
+        </div>
+      </div>
+
+      <!-- Estadísticas y Filtros -->
+      <div class="stats-filters">
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-number" id="totalReservas">-</div>
+            <div class="stat-label">Total Reservas</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="reservasSeleccionadas">-</div>
+            <div class="stat-label">Fecha Seleccionada</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="personasHoy">-</div>
+            <div class="stat-label">Personas Hoy</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="proximasReservas">-</div>
+            <div class="stat-label">Próximos 7 días</div>
+          </div>
+        </div>
+
+        <div class="filters">
+          <div class="filter-group">
+            <label class="filter-label">Vista rápida:</label>
+            <div class="filter-buttons">
+              <button class="filter-btn active" data-filter="selected" onclick="setQuickFilter(this, 'selected')">Seleccionada</button>
+              <button class="filter-btn" data-filter="hoy" onclick="setQuickFilter(this, 'hoy')">Hoy</button>
+              <button class="filter-btn" data-filter="semana" onclick="setQuickFilter(this, 'semana')">7 días</button>
+              <button class="filter-btn" data-filter="todas" onclick="setQuickFilter(this, 'todas')">Todas</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="filter-label">Ordenar por:</label>
+            <select class="filter-select" id="sortSelect" onchange="applyFilters()">
+              <option value="fecha-asc">Fecha (más próxima)</option>
+              <option value="fecha-desc">Fecha (más lejana)</option>
+              <option value="hora-asc">Hora (más temprana)</option>
+              <option value="hora-desc">Hora (más tardía)</option>
+              <option value="personas-desc">Más personas</option>
+              <option value="nombre-asc">Nombre A-Z</option>
+            </select>
+          </div>
+
+          <button class="refresh-btn" onclick="cargarReservas()">
+            🔄 Actualizar Datos
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="table-container">
+      <div id="selectedDateInfo" class="selected-date-info" style="display: none;">
+        📅 Mostrando reservas para: <span id="selectedDateText"></span>
+      </div>
+
       <div id="loading" class="loading">
         <div class="spinner"></div>
         <p>Cargando reservas...</p>
@@ -313,7 +599,7 @@
       <div id="noReservas" class="no-reservas" style="display: none;">
         <span class="emoji">📅</span>
         <h3>No hay reservas</h3>
-        <p>No se encontraron reservas para mostrar.</p>
+        <p>No se encontraron reservas para los criterios seleccionados.</p>
       </div>
 
       <table id="reservasTable" style="display: none;">
@@ -326,6 +612,7 @@
             <th>Hora</th>
             <th>Estado</th>
             <th>Creada</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="lista-reservas">
@@ -334,9 +621,31 @@
     </div>
   </div>
 
+  <!-- Modal de Confirmación de Cancelación -->
+  <div id="cancelModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">⚠️ Cancelar Reserva</h2>
+        <span class="close" onclick="closeCancelModal()">&times;</span>
+      </div>
+      <div class="modal-body" id="cancelModalBody">
+        <!-- Se llenará dinámicamente -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeCancelModal()">No, mantener</button>
+        <button class="btn btn-danger" onclick="confirmCancel()">Sí, cancelar reserva</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let allReservations = [];
-    let currentFilter = 'todas';
+    let filteredReservations = [];
+    let currentFilter = 'selected';
+    let selectedDate = new Date().toISOString().split('T')[0];
+    let currentMonth = new Date();
+    let reservationDates = new Set();
+    let cancelingReservation = null;
 
     function formatearHora(horaStr) {
       return horaStr ? horaStr.slice(0, 5) : '';
@@ -352,6 +661,17 @@
       });
     }
 
+    function formatearFechaCompleta(fechaStr) {
+      const date = new Date(fechaStr + 'T00:00:00');
+      if (isNaN(date)) return fechaStr;
+      return date.toLocaleDateString('es-ES', { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
     function formatearFechaCreada(isoStr) {
       if (!isoStr) return '-';
       const date = new Date(isoStr);
@@ -364,17 +684,113 @@
       });
     }
 
+    function renderCalendar() {
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      
+      document.getElementById('calendarTitle').textContent = 
+        `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+
+      const calendarGrid = document.getElementById('calendarGrid');
+      
+      // Limpiar grid (mantener headers)
+      const headers = calendarGrid.querySelectorAll('.calendar-day-header');
+      calendarGrid.innerHTML = '';
+      headers.forEach(header => calendarGrid.appendChild(header));
+
+      // Calcular primer día del mes
+      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const startDate = firstDay.getDay(); // 0 = Domingo
+      const today = new Date().toISOString().split('T')[0];
+
+      // Espacios vacíos al inicio
+      for (let i = 0; i < startDate; i++) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'calendar-day empty';
+        calendarGrid.appendChild(emptyDiv);
+      }
+
+      // Días del mes
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        const dateString = date.toISOString().split('T')[0];
+        
+        const dayBtn = document.createElement('div');
+        dayBtn.className = 'calendar-day';
+        dayBtn.textContent = day;
+        
+        // Determinar estado del día
+        if (dateString === today) {
+          dayBtn.classList.add('today');
+        }
+
+        if (dateString === selectedDate) {
+          dayBtn.classList.add('selected');
+        }
+
+        // Marcar días con reservas
+        if (reservationDates.has(dateString)) {
+          dayBtn.classList.add('has-reservations');
+        }
+
+        // Event listener para selección
+        dayBtn.addEventListener('click', function() {
+          // Remover selección anterior
+          document.querySelectorAll('.calendar-day').forEach(btn => {
+            btn.classList.remove('selected');
+          });
+          
+          // Seleccionar actual
+          this.classList.add('selected');
+          selectedDate = dateString;
+          
+          // Si el filtro actual es "selected", aplicar filtros
+          if (currentFilter === 'selected') {
+            applyFilters();
+          }
+          
+          console.log('Fecha seleccionada:', selectedDate);
+        });
+
+        calendarGrid.appendChild(dayBtn);
+      }
+    }
+
+    function previousMonth() {
+      const newMonth = new Date(currentMonth);
+      newMonth.setMonth(currentMonth.getMonth() - 1);
+      currentMonth = newMonth;
+      renderCalendar();
+    }
+
+    function nextMonth() {
+      const newMonth = new Date(currentMonth);
+      newMonth.setMonth(currentMonth.getMonth() + 1);
+      currentMonth = newMonth;
+      renderCalendar();
+    }
+
+    function setQuickFilter(buttonElement, filter) {
+      // Actualizar botones activos
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      buttonElement.classList.add('active');
+      
+      currentFilter = filter;
+      applyFilters();
+    }
+
     function updateStats() {
       const hoy = new Date().toISOString().split('T')[0];
-      const manana = new Date();
-      manana.setDate(manana.getDate() + 1);
-      const mananaStr = manana.toISOString().split('T')[0];
-      
       const proximos7Dias = new Date();
       proximos7Dias.setDate(proximos7Dias.getDate() + 7);
       
       const reservasHoy = allReservations.filter(r => r.fecha === hoy);
       const personasHoy = reservasHoy.reduce((sum, r) => sum + r.personas, 0);
+      
+      const reservasSeleccionadas = allReservations.filter(r => r.fecha === selectedDate);
       
       const reservasProximas = allReservations.filter(r => {
         const fechaReserva = new Date(r.fecha + 'T00:00:00');
@@ -382,40 +798,65 @@
       });
 
       document.getElementById('totalReservas').textContent = allReservations.length;
-      document.getElementById('reservasHoy').textContent = reservasHoy.length;
+      document.getElementById('reservasSeleccionadas').textContent = reservasSeleccionadas.length;
       document.getElementById('personasHoy').textContent = personasHoy;
       document.getElementById('proximasReservas').textContent = reservasProximas.length;
     }
 
-    function filterReservations() {
-      const filter = document.getElementById('filterSelect').value;
-      currentFilter = filter;
-      
-      let filteredReservations = [...allReservations];
+    function applyFilters() {
+      let filtered = [...allReservations];
       const hoy = new Date().toISOString().split('T')[0];
-      const manana = new Date();
-      manana.setDate(manana.getDate() + 1);
-      const mananaStr = manana.toISOString().split('T')[0];
-      
       const proximos7Dias = new Date();
       proximos7Dias.setDate(proximos7Dias.getDate() + 7);
 
-      switch (filter) {
-        case 'hoy':
-          filteredReservations = filteredReservations.filter(r => r.fecha === hoy);
+      // Aplicar filtro por fecha
+      switch (currentFilter) {
+        case 'selected':
+          filtered = filtered.filter(r => r.fecha === selectedDate);
+          document.getElementById('selectedDateInfo').style.display = 'block';
+          document.getElementById('selectedDateText').textContent = formatearFechaCompleta(selectedDate);
           break;
-        case 'manana':
-          filteredReservations = filteredReservations.filter(r => r.fecha === mananaStr);
+        case 'hoy':
+          filtered = filtered.filter(r => r.fecha === hoy);
+          document.getElementById('selectedDateInfo').style.display = 'none';
           break;
         case 'semana':
-          filteredReservations = filteredReservations.filter(r => {
+          filtered = filtered.filter(r => {
             const fechaReserva = new Date(r.fecha + 'T00:00:00');
             return fechaReserva <= proximos7Dias && fechaReserva >= new Date(hoy + 'T00:00:00');
           });
+          document.getElementById('selectedDateInfo').style.display = 'none';
+          break;
+        case 'todas':
+          document.getElementById('selectedDateInfo').style.display = 'none';
           break;
       }
 
-      renderReservations(filteredReservations);
+      // Aplicar ordenamiento
+      const sortBy = document.getElementById('sortSelect').value;
+      switch (sortBy) {
+        case 'fecha-asc':
+          filtered.sort((a, b) => new Date(a.fecha) - new Date(b.fecha) || a.hora.localeCompare(b.hora));
+          break;
+        case 'fecha-desc':
+          filtered.sort((a, b) => new Date(b.fecha) - new Date(a.fecha) || b.hora.localeCompare(a.hora));
+          break;
+        case 'hora-asc':
+          filtered.sort((a, b) => a.hora.localeCompare(b.hora));
+          break;
+        case 'hora-desc':
+          filtered.sort((a, b) => b.hora.localeCompare(a.hora));
+          break;
+        case 'personas-desc':
+          filtered.sort((a, b) => b.personas - a.personas);
+          break;
+        case 'nombre-asc':
+          filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
+          break;
+      }
+
+      filteredReservations = filtered;
+      renderReservations(filtered);
     }
 
     function renderReservations(reservations) {
@@ -451,9 +892,66 @@
             </span>
           </td>
           <td class="created-date">${formatearFechaCreada(reserva.created_at)}</td>
+          <td>
+            <button class="cancel-btn" onclick="showCancelModal(${reserva.id}, '${reserva.nombre}', '${reserva.fecha}', '${reserva.hora}', ${reserva.personas})">
+              ❌ Cancelar
+            </button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    function showCancelModal(id, nombre, fecha, hora, personas) {
+      cancelingReservation = { id, nombre, fecha, hora, personas };
+      
+      document.getElementById('cancelModalBody').innerHTML = `
+        <p><strong>¿Estás seguro de que quieres cancelar esta reserva?</strong></p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0;">
+          <p><strong>👤 Cliente:</strong> ${nombre}</p>
+          <p><strong>📅 Fecha:</strong> ${formatearFechaCompleta(fecha)}</p>
+          <p><strong>🕒 Hora:</strong> ${hora}</p>
+          <p><strong>👥 Personas:</strong> ${personas}</p>
+        </div>
+        <p style="color: #dc3545; font-size: 14px;">
+          <strong>⚠️ Atención:</strong> Esta acción no se puede deshacer. La reserva será eliminada permanentemente.
+        </p>
+      `;
+      
+      document.getElementById('cancelModal').style.display = 'block';
+    }
+
+    function closeCancelModal() {
+      document.getElementById('cancelModal').style.display = 'none';
+      cancelingReservation = null;
+    }
+
+    async function confirmCancel() {
+      if (!cancelingReservation) return;
+      
+      try {
+        console.log('Cancelando reserva ID:', cancelingReservation.id);
+        
+        const response = await fetch(`/api/reservas/${cancelingReservation.id}/cancelar`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          alert('✅ Reserva cancelada exitosamente');
+          closeCancelModal();
+          cargarReservas(); // Recargar datos
+        } else {
+          const errorText = await response.text();
+          alert('❌ Error al cancelar la reserva: ' + errorText);
+        }
+        
+      } catch (error) {
+        console.error('Error al cancelar reserva:', error);
+        alert('❌ Error al cancelar la reserva: ' + error.message);
+      }
     }
 
     async function cargarReservas() {
@@ -463,40 +961,56 @@
         document.getElementById('noReservas').style.display = 'none';
         
         console.log('Cargando reservas...');
-        const res = await fetch('/api/reservas');
+        const response = await fetch('/api/reservas');
         
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        const data = await res.json();
+        const data = await response.json();
         console.log('Reservas cargadas:', data);
         
         allReservations = data;
+        
+        // Crear set de fechas con reservas para el calendario
+        reservationDates.clear();
+        data.forEach(reserva => {
+          reservationDates.add(reserva.fecha);
+        });
+        
         document.getElementById('loading').style.display = 'none';
         
         updateStats();
-        filterReservations();
+        renderCalendar();
+        applyFilters();
         
-      } catch (err) {
-        console.error('Error al cargar reservas:', err);
+      } catch (error) {
+        console.error('Error al cargar reservas:', error);
         document.getElementById('loading').innerHTML = `
           <div style="color: #dc3545;">
             <h3>❌ Error al cargar reservas</h3>
-            <p>${err.message}</p>
+            <p>${error.message}</p>
             <button class="refresh-btn" onclick="cargarReservas()" style="margin-top: 20px;">
-              Reintentar
+              🔄 Reintentar
             </button>
           </div>
         `;
       }
     }
 
-    // Cargar reservas al inicio
+    // Cerrar modal al hacer clic fuera
+    window.onclick = function(event) {
+      const modal = document.getElementById('cancelModal');
+      if (event.target === modal) {
+        closeCancelModal();
+      }
+    }
+
+    // Inicializar
     cargarReservas();
     
-    // Refrescar cada 30 segundos
-    setInterval(cargarReservas, 30000);
+    // Auto-refresh cada 60 segundos
+    setInterval(cargarReservas, 60000);
   </script>
 </body>
 </html>
