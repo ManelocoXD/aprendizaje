@@ -1,26 +1,23 @@
-const { createClient } = require('@supabase/supabase-js');
+const { google } = require('googleapis');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+// Configurar Google Sheets
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    type: "service_account",
+    project_id: process.env.GOOGLE_PROJECT_ID,
+    private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.GOOGLE_CLIENT_EMAIL}`
+  },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
 
-function formatearFecha(fechaStr) {
-  const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-
-  const fecha = new Date(fechaStr + 'T00:00:00');
-  if (isNaN(fecha)) {
-    console.log('Fecha inválida:', fechaStr);
-    return fechaStr;
-  }
-
-  const diaSemana = diasSemana[fecha.getDay()];
-  const dia = fecha.getDate();
-  const mes = meses[fecha.getMonth()];
-
-  return `${diaSemana} día ${dia} de ${mes}`;
-}
+const sheets = google.sheets({ version: 'v4', auth });
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,84 +33,23 @@ module.exports = async (req, res) => {
   try {
     console.log('Denegando reserva ID:', id);
     
-    // Obtener la reserva antes de eliminarla
-    const { data: reserva, error: selectError } = await supabase
-      .from('reservas')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (selectError || !reserva) {
-      console.error('Error al obtener reserva:', selectError);
+    // Buscar la reserva por ID
+    const reserva = await findReservaById(id);
+    
+    if (!reserva) {
       return res.status(404).json({ error: "Reserva no encontrada" });
     }
 
     console.log('Reserva encontrada para denegar:', reserva);
 
-    // Preparar datos del email antes de eliminar
-    const fechaFormateada = formatearFecha(reserva.fecha);
-    
-    const emailData = {
-      shouldSendEmail: true,
-      emailType: reserva.email ? 'cliente' : 'restaurante',
-      emailParams: {
-        to_name: reserva.email ? reserva.nombre : "Equipo del Restaurante",
-        to_email: reserva.email || process.env.RESTAURANT_EMAIL,
-        subject: reserva.email ? "Reserva no disponible ❌" : "Reserva Denegada ❌ - Cliente contactado",
-        message: reserva.email ? 
-          `Hola ${reserva.nombre},
-
-Lamentamos informarte que tu reserva no ha podido ser confirmada:
-
-📅 Fecha solicitada: ${fechaFormateada}
-🕐 Hora: ${reserva.hora}
-👥 Personas: ${reserva.personas}
-
-MOTIVO: No hay disponibilidad para esa fecha y hora.
-
-¿Te interesa otra fecha? Contacta con nosotros:
-📞 Teléfono: ${process.env.RESTAURANT_PHONE}
-📧 Email: ${process.env.RESTAURANT_EMAIL}
-
-¡Esperamos poder atenderte pronto!
-
-Gracias por tu comprensión.` :
-          `Se ha DENEGADO una reserva. Datos del cliente:
-
-👤 Cliente: ${reserva.nombre}
-📞 Teléfono: ${reserva.telefono}
-📧 Email: ${reserva.email || 'No proporcionado'}
-📅 Fecha solicitada: ${fechaFormateada}
-🕐 Hora: ${reserva.hora}
-👥 Personas: ${reserva.personas}
-
-ACCIÓN RECOMENDADA:
-- Contactar al cliente para ofrecer fechas alternativas
-- Verificar si hay cancelaciones próximas para esa fecha
-- Ofrecer horarios alternativos cercanos
-
-El cliente ha sido informado de la denegación.`,
-        reply_to: process.env.RESTAURANT_EMAIL
-      }
-    };
-    
-    // Eliminar la reserva
-    const { error: deleteError } = await supabase
-      .from('reservas')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      console.error('Error al eliminar reserva:', deleteError);
-      return res.status(500).json({ error: "Error al eliminar reserva" });
-    }
+    // Eliminar la fila completa
+    await deleteReserva(reserva.rowIndex);
 
     console.log('Reserva eliminada exitosamente');
     
     res.status(200).json({ 
       success: true, 
-      message: "Reserva denegada y eliminada",
-      emailData: emailData
+      message: "Reserva denegada y eliminada exitosamente"
     });
     
   } catch (err) {
@@ -124,3 +60,68 @@ El cliente ha sido informado de la denegación.`,
     });
   }
 };
+
+async function findReservaById(id) {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: 'A:I',
+    });
+
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) return null;
+
+    // Buscar por ID
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === id.toString()) {
+        return {
+          id: rows[i][0],
+          nombre: rows[i][1],
+          telefono: rows[i][2],
+          email: rows[i][3],
+          personas: rows[i][4],
+          fecha: rows[i][5],
+          hora: rows[i][6],
+          estado: rows[i][7],
+          created_at: rows[i][8],
+          rowIndex: i + 1 // +1 porque sheets empieza en 1
+        };
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error buscando reserva:', error);
+    throw error;
+  }
+}
+
+async function deleteReserva(rowIndex) {
+  try {
+    // Eliminar la fila completa
+    const response = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      resource: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: 0, // ID de la primera hoja
+                dimension: 'ROWS',
+                startIndex: rowIndex - 1, // -1 porque la API usa índice base 0
+                endIndex: rowIndex
+              }
+            }
+          }
+        ]
+      }
+    });
+
+    console.log('Fila eliminada:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error eliminando fila:', error);
+    throw error;
+  }
+}
