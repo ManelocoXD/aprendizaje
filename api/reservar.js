@@ -29,12 +29,20 @@ module.exports = async (req, res) => {
   }
 
   try {
-    console.log('Guardando reserva en Google Sheets:', { nombre, telefono, email, personas, hora, fecha });
+    console.log('Guardando reserva confirmada automáticamente:', { nombre, telefono, email, personas, hora, fecha });
+
+    // Verificar disponibilidad antes de guardar
+    const isAvailable = await checkAvailability(fecha, hora, personas);
+    if (!isAvailable) {
+      return res.status(409).json({ 
+        error: "Lo sentimos, ya no hay disponibilidad para esta fecha y hora. Por favor, selecciona otro horario." 
+      });
+    }
 
     // Obtener el siguiente ID
     const nextId = await getNextId();
 
-    // Preparar los datos para insertar
+    // Preparar los datos para insertar - ESTADO: "confirmada" directamente
     const values = [
       [
         nextId, // ID
@@ -44,7 +52,7 @@ module.exports = async (req, res) => {
         parseInt(personas),
         fecha,
         hora,
-        'pendiente',
+        'confirmada', // ← Cambiado de 'pendiente' a 'confirmada'
         new Date().toISOString()
       ]
     ];
@@ -62,22 +70,69 @@ module.exports = async (req, res) => {
 
     const response = await sheets.spreadsheets.values.append(request);
 
-    console.log('Reserva guardada exitosamente en fila:', response.data.updates.updatedRange);
+    console.log('Reserva confirmada guardada exitosamente en fila:', response.data.updates.updatedRange);
 
     res.status(200).json({ 
-      message: "Reserva guardada exitosamente",
+      message: "Reserva confirmada exitosamente",
       id: nextId,
-      range: response.data.updates.updatedRange
+      range: response.data.updates.updatedRange,
+      status: "confirmada"
     });
 
   } catch (err) {
     console.error("Error al guardar reserva:", err);
     res.status(500).json({ 
-      error: "Error al guardar en Google Sheets",
+      error: "Error al procesar la reserva",
       details: err.message 
     });
   }
 };
+
+async function checkAvailability(fecha, hora, personas) {
+  try {
+    console.log(`Verificando disponibilidad final para ${fecha} ${hora} - ${personas} personas`);
+    
+    // Obtener reservas confirmadas para esta fecha y hora
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: 'A:I',
+    });
+
+    const rows = response.data.values || [];
+    
+    if (rows.length <= 1) {
+      return true; // No hay reservas, disponible
+    }
+
+    // Contar personas ya reservadas en esta fecha y hora
+    const confirmedReservations = rows.slice(1)
+      .filter(row => {
+        const rowFecha = row[5];
+        const rowHora = row[6];
+        const rowEstado = row[7];
+        return rowFecha === fecha && rowHora === hora && rowEstado === 'confirmada';
+      });
+
+    const totalPersonasReservadas = confirmedReservations.reduce((sum, row) => {
+      return sum + (parseInt(row[4]) || 0);
+    }, 0);
+
+    const capacidadMaxima = 50; // Mismo valor que en disponibilidad.js
+    const espaciosDisponibles = capacidadMaxima - totalPersonasReservadas;
+
+    console.log(`Fecha: ${fecha}, Hora: ${hora}`);
+    console.log(`Personas ya reservadas: ${totalPersonasReservadas}`);
+    console.log(`Espacios disponibles: ${espaciosDisponibles}`);
+    console.log(`Personas solicitadas: ${personas}`);
+
+    return espaciosDisponibles >= personas;
+
+  } catch (error) {
+    console.error('Error verificando disponibilidad:', error);
+    // En caso de error, permitir la reserva (fallback conservativo)
+    return true;
+  }
+}
 
 async function getNextId() {
   try {

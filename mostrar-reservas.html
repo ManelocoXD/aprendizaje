@@ -2,84 +2,466 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Lista de Reservas</title>
+  <title>Lista de Reservas Confirmadas</title>
   <style>
-    table {
-      border-collapse: collapse;
-      width: 95%;
-      margin: 20px auto;
-      font-family: Arial, sans-serif;
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
     }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
     }
-    th {
-      background-color: #333;
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-    }
-    tbody tr:nth-child(even) {
-      background-color: #f2f2f2;
-    }
-    h1 {
+      padding: 30px;
       text-align: center;
-      font-family: Arial, sans-serif;
-      margin-top: 30px;
     }
-    button {
-      margin: 0 3px;
-      padding: 6px 12px;
-      cursor: pointer;
+
+    .header h1 {
+      margin: 0;
+      font-size: 2em;
+      font-weight: 300;
+    }
+
+    .header p {
+      margin: 10px 0 0 0;
+      opacity: 0.9;
+      font-size: 1.1em;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 30px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-number {
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .controls {
+      padding: 20px 30px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .refresh-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
       border: none;
-      border-radius: 4px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .refresh-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .filter-select {
+      padding: 8px 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 14px;
+      background: white;
+    }
+
+    .table-container {
+      padding: 0 30px 30px 30px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    }
+
+    th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
+      padding: 15px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 14px;
     }
-    .confirmar {
-      background-color: #28a745;
+
+    td {
+      padding: 15px 12px;
+      border-bottom: 1px solid #f1f1f1;
+      font-size: 14px;
     }
-    .denegar {
-      background-color: #dc3545;
+
+    tbody tr:hover {
+      background-color: #f8f9ff;
     }
-    .confirmar:hover {
-      background-color: #218838;
+
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
     }
-    .denegar:hover {
-      background-color: #c82333;
+
+    .status-confirmada {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .date-cell {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .time-cell {
+      font-weight: 600;
+      color: #667eea;
+      font-size: 15px;
+    }
+
+    .people-cell {
+      text-align: center;
+      font-weight: 600;
+      color: #764ba2;
+    }
+
+    .name-cell {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .contact-cell {
+      color: #666;
+      font-size: 13px;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #667eea;
+    }
+
+    .loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .no-reservas {
+      text-align: center;
+      padding: 60px;
+      color: #999;
+    }
+
+    .no-reservas .emoji {
+      font-size: 3em;
+      margin-bottom: 20px;
+      display: block;
+    }
+
+    .auto-refresh {
+      color: #666;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .auto-refresh .dot {
+      width: 8px;
+      height: 8px;
+      background: #28a745;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    .created-date {
+      color: #999;
+      font-size: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      table {
+        font-size: 12px;
+      }
+      
+      th, td {
+        padding: 10px 8px;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Reservas recibidas</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>Nombre</th>
-        <th>Email</th>
-        <th>Teléfono</th>
-        <th>Personas</th>
-        <th>Fecha</th>
-        <th>Hora</th>
-        <th>Estado</th>
-        <th>Acciones</th>
-      </tr>
-    </thead>
-    <tbody id="lista-reservas"></tbody>
-  </table>
+  <div class="container">
+    <div class="header">
+      <h1>📋 Reservas Confirmadas</h1>
+      <p>Sistema de gestión de reservas del restaurante</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-number" id="totalReservas">-</div>
+        <div class="stat-label">Total Reservas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="reservasHoy">-</div>
+        <div class="stat-label">Reservas Hoy</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="personasHoy">-</div>
+        <div class="stat-label">Personas Hoy</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="proximasReservas">-</div>
+        <div class="stat-label">Próximas 7 días</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div>
+        <select class="filter-select" id="filterSelect" onchange="filterReservations()">
+          <option value="todas">Todas las reservas</option>
+          <option value="hoy">Solo hoy</option>
+          <option value="manana">Solo mañana</option>
+          <option value="semana">Próximos 7 días</option>
+        </select>
+      </div>
+      <div style="display: flex; align-items: center; gap: 15px;">
+        <div class="auto-refresh">
+          <div class="dot"></div>
+          Actualización automática
+        </div>
+        <button class="refresh-btn" onclick="cargarReservas()">
+          🔄 Actualizar
+        </button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Cargando reservas...</p>
+      </div>
+
+      <div id="noReservas" class="no-reservas" style="display: none;">
+        <span class="emoji">📅</span>
+        <h3>No hay reservas</h3>
+        <p>No se encontraron reservas para mostrar.</p>
+      </div>
+
+      <table id="reservasTable" style="display: none;">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Contacto</th>
+            <th>Personas</th>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Estado</th>
+            <th>Creada</th>
+          </tr>
+        </thead>
+        <tbody id="lista-reservas">
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <script>
+    let allReservations = [];
+    let currentFilter = 'todas';
+
     function formatearHora(horaStr) {
       return horaStr ? horaStr.slice(0, 5) : '';
     }
 
     function formatearFecha(fechaStr) {
-      const date = new Date(fechaStr);
+      const date = new Date(fechaStr + 'T00:00:00');
       if (isNaN(date)) return fechaStr;
-      return date.toLocaleDateString('es-ES');
+      return date.toLocaleDateString('es-ES', { 
+        weekday: 'short', 
+        day: 'numeric', 
+        month: 'short' 
+      });
+    }
+
+    function formatearFechaCreada(isoStr) {
+      if (!isoStr) return '-';
+      const date = new Date(isoStr);
+      if (isNaN(date)) return '-';
+      return date.toLocaleDateString('es-ES', { 
+        day: 'numeric', 
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function updateStats() {
+      const hoy = new Date().toISOString().split('T')[0];
+      const manana = new Date();
+      manana.setDate(manana.getDate() + 1);
+      const mananaStr = manana.toISOString().split('T')[0];
+      
+      const proximos7Dias = new Date();
+      proximos7Dias.setDate(proximos7Dias.getDate() + 7);
+      
+      const reservasHoy = allReservations.filter(r => r.fecha === hoy);
+      const personasHoy = reservasHoy.reduce((sum, r) => sum + r.personas, 0);
+      
+      const reservasProximas = allReservations.filter(r => {
+        const fechaReserva = new Date(r.fecha + 'T00:00:00');
+        return fechaReserva <= proximos7Dias && fechaReserva >= new Date(hoy + 'T00:00:00');
+      });
+
+      document.getElementById('totalReservas').textContent = allReservations.length;
+      document.getElementById('reservasHoy').textContent = reservasHoy.length;
+      document.getElementById('personasHoy').textContent = personasHoy;
+      document.getElementById('proximasReservas').textContent = reservasProximas.length;
+    }
+
+    function filterReservations() {
+      const filter = document.getElementById('filterSelect').value;
+      currentFilter = filter;
+      
+      let filteredReservations = [...allReservations];
+      const hoy = new Date().toISOString().split('T')[0];
+      const manana = new Date();
+      manana.setDate(manana.getDate() + 1);
+      const mananaStr = manana.toISOString().split('T')[0];
+      
+      const proximos7Dias = new Date();
+      proximos7Dias.setDate(proximos7Dias.getDate() + 7);
+
+      switch (filter) {
+        case 'hoy':
+          filteredReservations = filteredReservations.filter(r => r.fecha === hoy);
+          break;
+        case 'manana':
+          filteredReservations = filteredReservations.filter(r => r.fecha === mananaStr);
+          break;
+        case 'semana':
+          filteredReservations = filteredReservations.filter(r => {
+            const fechaReserva = new Date(r.fecha + 'T00:00:00');
+            return fechaReserva <= proximos7Dias && fechaReserva >= new Date(hoy + 'T00:00:00');
+          });
+          break;
+      }
+
+      renderReservations(filteredReservations);
+    }
+
+    function renderReservations(reservations) {
+      const tbody = document.getElementById('lista-reservas');
+      const table = document.getElementById('reservasTable');
+      const noReservas = document.getElementById('noReservas');
+      
+      if (reservations.length === 0) {
+        table.style.display = 'none';
+        noReservas.style.display = 'block';
+        return;
+      }
+
+      table.style.display = 'table';
+      noReservas.style.display = 'none';
+      
+      tbody.innerHTML = '';
+      
+      reservations.forEach(reserva => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="name-cell">${reserva.nombre}</td>
+          <td class="contact-cell">
+            📧 ${reserva.email || 'No proporcionado'}<br>
+            📱 ${reserva.telefono}
+          </td>
+          <td class="people-cell">${reserva.personas}</td>
+          <td class="date-cell">${formatearFecha(reserva.fecha)}</td>
+          <td class="time-cell">${formatearHora(reserva.hora)}</td>
+          <td>
+            <span class="status-badge status-confirmada">
+              ✅ Confirmada
+            </span>
+          </td>
+          <td class="created-date">${formatearFechaCreada(reserva.created_at)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
 
     async function cargarReservas() {
       try {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('reservasTable').style.display = 'none';
+        document.getElementById('noReservas').style.display = 'none';
+        
         console.log('Cargando reservas...');
         const res = await fetch('/api/reservas');
         
@@ -90,91 +472,31 @@
         const data = await res.json();
         console.log('Reservas cargadas:', data);
         
-        const tbody = document.getElementById('lista-reservas');
-        tbody.innerHTML = '';
+        allReservations = data;
+        document.getElementById('loading').style.display = 'none';
         
-        data.forEach(reserva => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${reserva.nombre}</td>
-            <td>${reserva.email || 'No proporcionado'}</td>
-            <td>${reserva.telefono}</td>
-            <td>${reserva.personas}</td>
-            <td>${formatearFecha(reserva.fecha)}</td>
-            <td>${formatearHora(reserva.hora)}</td>
-            <td>${reserva.estado}</td>
-            <td>
-              ${reserva.estado === 'pendiente' ? `
-                <button class="confirmar" onclick="confirmar(${reserva.id})">Confirmar</button>
-                <button class="denegar" onclick="denegar(${reserva.id})">Denegar</button>
-              ` : `<span>-</span>`}
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
+        updateStats();
+        filterReservations();
+        
       } catch (err) {
         console.error('Error al cargar reservas:', err);
-        alert('Error al cargar reservas: ' + err.message);
-      }
-    }
-
-    async function confirmar(id) {
-      try {
-        console.log('Confirmando reserva ID:', id);
-        const res = await fetch(`/api/reservas/${id}/confirmar`, { 
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const result = await res.text();
-        console.log('Respuesta confirmar:', result);
-        
-        if (res.ok) {
-          alert('Reserva confirmada exitosamente');
-        } else {
-          alert('Error al confirmar: ' + result);
-        }
-        
-        cargarReservas();
-      } catch (err) {
-        console.error('Error al confirmar reserva:', err);
-        alert('Error al confirmar reserva: ' + err.message);
-      }
-    }
-
-    async function denegar(id) {
-      try {
-        console.log('Denegando reserva ID:', id);
-        const res = await fetch(`/api/reservas/${id}/denegar`, { 
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        const result = await res.text();
-        console.log('Respuesta denegar:', result);
-        
-        if (res.ok) {
-          alert('Reserva denegada exitosamente');
-        } else {
-          alert('Error al denegar: ' + result);
-        }
-        
-        cargarReservas();
-      } catch (err) {
-        console.error('Error al denegar reserva:', err);
-        alert('Error al denegar reserva: ' + err.message);
+        document.getElementById('loading').innerHTML = `
+          <div style="color: #dc3545;">
+            <h3>❌ Error al cargar reservas</h3>
+            <p>${err.message}</p>
+            <button class="refresh-btn" onclick="cargarReservas()" style="margin-top: 20px;">
+              Reintentar
+            </button>
+          </div>
+        `;
       }
     }
 
     // Cargar reservas al inicio
     cargarReservas();
     
-    // Refrescar cada minuto
-    setInterval(cargarReservas, 60000);
+    // Refrescar cada 30 segundos
+    setInterval(cargarReservas, 30000);
   </script>
 </body>
 </html>
