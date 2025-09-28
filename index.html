@@ -1,41 +1,681 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Crear Reserva</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservar Mesa - Restaurante</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+      position: relative;
+    }
+
+    .header h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+      font-weight: 300;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1em;
+    }
+
+    .progress-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      width: 100%;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: white;
+      width: 33.33%;
+      transition: width 0.3s ease;
+    }
+
+    .step-indicator {
+      padding: 20px 30px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      color: #6c757d;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .step.active {
+      color: #667eea;
+    }
+
+    .step.completed {
+      color: #28a745;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #e9ecef;
+      color: #6c757d;
+      margin-right: 8px;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .step.active .step-number {
+      background: #667eea;
+      color: white;
+    }
+
+    .step.completed .step-number {
+      background: #28a745;
+      color: white;
+    }
+
+    .form-container {
+      padding: 40px 30px;
+    }
+
+    .step-content {
+      display: none;
+    }
+
+    .step-content.active {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    input[type="text"], 
+    input[type="email"], 
+    input[type="tel"], 
+    input[type="number"] {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e9ecef;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      background: #fff;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .people-selector {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .people-btn {
+      padding: 15px;
+      border: 2px solid #e9ecef;
+      background: white;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .people-btn:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .people-btn.selected {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+
+    .people-btn .emoji {
+      font-size: 20px;
+    }
+
+    .date-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .date-header {
+      text-align: center;
+      font-weight: 600;
+      color: #666;
+      padding: 10px 5px;
+      font-size: 12px;
+    }
+
+    .date-btn {
+      aspect-ratio: 1;
+      border: 1px solid #e9ecef;
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 50px;
+      position: relative;
+    }
+
+    .date-btn:hover:not(.disabled):not(.unavailable) {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .date-btn.selected {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+
+    .date-btn.disabled {
+      background: #f8f9fa;
+      color: #adb5bd;
+      cursor: not-allowed;
+    }
+
+    .date-btn.unavailable {
+      background: #ffe6e6;
+      color: #999;
+      cursor: not-allowed;
+      position: relative;
+    }
+
+    .date-btn.unavailable:after {
+      content: '✗';
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 10px;
+      color: #dc3545;
+    }
+
+    .date-btn.today {
+      border-color: #28a745;
+      color: #28a745;
+      font-weight: 600;
+    }
+
+    .date-btn.available:after {
+      content: '✓';
+      position: absolute;
+      bottom: 2px;
+      right: 4px;
+      font-size: 10px;
+      color: #28a745;
+    }
+
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .time-btn {
+      padding: 15px;
+      border: 2px solid #e9ecef;
+      background: white;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      text-align: center;
+      position: relative;
+    }
+
+    .time-btn:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .time-btn.selected {
+      border-color: #667eea;
+      background: #667eea;
+      color: white;
+    }
+
+    .time-btn .capacity {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+
+    .navigation {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+      gap: 15px;
+    }
+
+    .btn {
+      padding: 15px 30px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      flex: 1;
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #5a6268;
+      transform: translateY(-2px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .error-message {
+      color: #dc3545;
+      font-size: 14px;
+      margin-top: 5px;
+      display: none;
+    }
+
+    .month-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 0 10px;
+    }
+
+    .month-btn {
+      background: none;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.3s ease;
+    }
+
+    .month-btn:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .month-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #667eea;
+    }
+
+    .loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .success-message {
+      text-align: center;
+      padding: 40px;
+      color: #28a745;
+    }
+
+    .success-message .emoji {
+      font-size: 48px;
+      margin-bottom: 20px;
+      display: block;
+    }
+
+    .date-info {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .availability-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 15px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .legend {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .reservation-summary {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .reservation-summary h4 {
+      color: #333;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .summary-label {
+      color: #666;
+    }
+
+    .summary-value {
+      color: #333;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body>
-  <h1>Haz tu reserva</h1>
-  <form id="formulario">
-    <input type="text" name="nombre" placeholder="Nombre completo" required />
-    <input type="tel" name="telefono" placeholder="Teléfono" required />
-    <input type="email" name="email" placeholder="Email (opcional)" />
-    <input type="number" name="personas" placeholder="Número de personas" min="1" required />
-    <input type="date" name="fecha" required />
-    <input type="time" name="hora" required />
-    <button type="submit">Reservar</button>
-  </form>
+  <div class="container">
+    <div class="header">
+      <h1>🍽️ Reservar Mesa</h1>
+      <p>Reserva tu mesa en unos simples pasos</p>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressBar"></div>
+      </div>
+    </div>
 
-  <script>
-    const form = document.getElementById('formulario');
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      const datos = Object.fromEntries(new FormData(form));
+    <div class="step-indicator">
+      <div class="step active" id="step1Indicator">
+        <div class="step-number">1</div>
+        <span>Datos</span>
+      </div>
+      <div class="step" id="step2Indicator">
+        <div class="step-number">2</div>
+        <span>Fecha</span>
+      </div>
+      <div class="step" id="step3Indicator">
+        <div class="step-number">3</div>
+        <span>Hora</span>
+      </div>
+    </div>
 
-      try {
-        const res = await fetch('/api/reservar', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(datos),
-        });
-        const mensaje = await res.text();
-        alert(mensaje);
-        form.reset();
-      } catch (err) {
-        alert('Error al enviar la reserva');
-        console.error(err);
-      }
-    });
-  </script>
-</body>
-</html>
+    <div class="form-container">
+      <!-- PASO 1: Datos personales -->
+      <div class="step-content active" id="step1">
+        <div class="form-group">
+          <label for="nombre">Nombre completo *</label>
+          <input type="text" id="nombre" placeholder="Tu nombre completo" required>
+          <div class="error-message" id="nombreError">Por favor, ingresa tu nombre completo</div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Correo electrónico *</label>
+          <input type="email" id="email" placeholder="tu@email.com" required>
+          <div class="error-message" id="emailError">Por favor, ingresa un email válido</div>
+        </div>
+
+        <div class="form-group">
+          <label for="telefono">Número de teléfono *</label>
+          <input type="tel" id="telefono" placeholder="+34 123 456 789" required>
+          <div class="error-message" id="telefonoError">Por favor, ingresa tu número de teléfono</div>
+        </div>
+
+        <div class="form-group">
+          <label>Número de personas *</label>
+          <div class="people-selector">
+            <div class="people-btn" data-people="1">
+              <span class="emoji">👤</span>
+              <span>1</span>
+            </div>
+            <div class="people-btn" data-people="2">
+              <span class="emoji">👥</span>
+              <span>2</span>
+            </div>
+            <div class="people-btn" data-people="3">
+              <span class="emoji">👨‍👩‍👧</span>
+              <span>3</span>
+            </div>
+            <div class="people-btn" data-people="4">
+              <span class="emoji">👨‍👩‍👧‍👦</span>
+              <span>4</span>
+            </div>
+            <div class="people-btn" data-people="5">
+              <span class="emoji">👪</span>
+              <span>5</span>
+            </div>
+            <div class="people-btn" data-people="6">
+              <span class="emoji">🧑‍🤝‍🧑</span>
+              <span>6</span>
+            </div>
+            <div class="people-btn" data-people="7">
+              <span class="emoji">👨‍👩‍👧‍👦</span>
+              <span>7</span>
+            </div>
+            <div class="people-btn" data-people="8">
+              <span class="emoji">🎉</span>
+              <span>8+</span>
+            </div>
+          </div>
+          <div class="error-message" id="personasError">Por favor, selecciona el número de personas</div>
+        </div>
+
+        <div class="navigation">
+          <button class="btn btn-primary" onclick="nextStep()">
+            Siguiente: Seleccionar fecha →
+          </button>
+        </div>
+      </div>
+
+      <!-- PASO 2: Seleccionar fecha -->
+      <div class="step-content" id="step2">
+        <div class="form-group">
+          <label>Selecciona el día de tu reserva</label>
+          <div class="month-navigation">
+            <button class="month-btn" onclick="previousMonth()">‹</button>
+            <div class="month-title" id="monthTitle"></div>
+            <button class="month-btn" onclick="nextMonth()">›</button>
+          </div>
+          
+          <div class="date-grid" id="dateGrid">
+            <!-- Headers de días -->
+            <div class="date-header">Dom</div>
+            <div class="date-header">Lun</div>
+            <div class="date-header">Mar</div>
+            <div class="date-header">Mié</div>
+            <div class="date-header">Jue</div>
+            <div class="date-header">Vie</div>
+            <div class="date-header">Sáb</div>
+          </div>
+          
+          <div class="availability-info">
+            <div class="legend">
+              <div class="legend-item">
+                <div class="legend-color" style="background: #28a745;"></div>
+                <span>Disponible</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: #ffe6e6;"></div>
+                <span>Sin disponibilidad</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-color" style="background: #f8f9fa;"></div>
+                <span>Cerrado</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="error-message" id="fechaError">Por favor, selecciona una fecha disponible</div>
+        </div>
+
+        <div class="navigation">
+          <button class="btn btn-secondary" onclick="previousStep()">
+            ← Atrás
+          </button>
+          <button class="btn btn-primary" onclick="nextStep()" disabled id="dateNextBtn">
+            Siguiente: Elegir hora →
+          </button>
+        </div>
+      </div>
+
+      <!-- PASO 3: Seleccionar hora -->
+      <div class="step-content" id="step3">
+        <div class="date-info" id="selectedDateInfo">
+          <strong>📅 Fecha seleccionada:</strong> <span id="selectedDateDisplay"></span>
+        </div>
+
+        <div class="form-group">
+          <label>Selecciona la hora de tu reserva</label>
+          <div class="time-grid" id="timeGrid">
+            <!-- Se llenarán dinámicamente los horarios disponibles -->
+          </div>
+          <div class="error-message" id="horaError">Por favor, selecciona una hora</div>
+        </div>
+
+        <div class="reservation-summary">
+          <h4>📋 Resumen de tu reserva</h4>
+          <div class="summary-item">
+            <span class="summary-label">Nombre:</span>
+            <span class="summary-value" id="summaryName"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Email:</span>
+            <span class="summary-value" id="summaryEmail"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Teléfono:</span>
+            <span class="summary-value" id="summaryPhone"></span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Personas:</span>
+            <span class="summary-value" id="summaryPeople"></span>
