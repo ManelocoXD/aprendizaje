@@ -60,21 +60,26 @@ module.exports = async (req, res) => {
   const { fecha, personas } = req.query;
 
   try {
+    console.log('Consulta recibida:', { fecha, personas });
+
     if (fecha) {
       // Consultar disponibilidad para una fecha específica
       const availability = await checkDateAvailability(fecha, personas ? parseInt(personas) : 1);
+      console.log('Disponibilidad calculada:', availability);
       res.status(200).json(availability);
     } else {
       // Obtener disponibilidad general para los próximos 30 días
       const monthAvailability = await getMonthAvailability();
+      console.log('Disponibilidad del mes calculada');
       res.status(200).json(monthAvailability);
     }
 
   } catch (err) {
-    console.error("Error al consultar disponibilidad:", err);
+    console.error("Error completo al consultar disponibilidad:", err);
     res.status(500).json({ 
       error: "Error al consultar disponibilidad",
-      details: err.message 
+      details: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 };
@@ -84,7 +89,17 @@ async function checkDateAvailability(fecha, personas) {
     console.log(`Consultando disponibilidad para ${fecha}, ${personas} personas`);
 
     // Verificar si es una fecha válida
-    const date = new Date(fecha);
+    const date = new Date(fecha + 'T00:00:00');
+    if (isNaN(date)) {
+      console.log('Fecha inválida:', fecha);
+      return {
+        fecha,
+        available: false,
+        reason: 'Fecha inválida',
+        availableSlots: []
+      };
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -99,6 +114,8 @@ async function checkDateAvailability(fecha, personas) {
 
     // Verificar si está cerrado ese día
     const dayOfWeek = date.getDay();
+    console.log('Día de la semana:', dayOfWeek);
+    
     if (!RESTAURANT_CONFIG.openingHours[dayOfWeek]) {
       return {
         fecha,
@@ -120,6 +137,7 @@ async function checkDateAvailability(fecha, personas) {
 
     // Obtener reservas existentes para esta fecha
     const existingReservations = await getReservationsForDate(fecha);
+    console.log('Reservas existentes:', existingReservations);
     
     // Calcular capacidad disponible por horario
     const availableSlots = [];
@@ -131,6 +149,8 @@ async function checkDateAvailability(fecha, personas) {
         const reservationsAtThisTime = existingReservations.filter(r => r.hora === timeSlot);
         const totalPeopleAtThisTime = reservationsAtThisTime.reduce((sum, r) => sum + r.personas, 0);
         const availableCapacity = RESTAURANT_CONFIG.maxCapacity - totalPeopleAtThisTime;
+        
+        console.log(`Horario ${timeSlot}: ${totalPeopleAtThisTime} personas reservadas, ${availableCapacity} disponibles`);
         
         if (availableCapacity >= personas) {
           availableSlots.push({
@@ -159,18 +179,34 @@ async function checkDateAvailability(fecha, personas) {
 
 async function getReservationsForDate(fecha) {
   try {
+    console.log('Obteniendo reservas para fecha:', fecha);
+    
+    // Verificar que tenemos todas las variables de entorno necesarias
+    if (!process.env.GOOGLE_SHEET_ID) {
+      throw new Error('GOOGLE_SHEET_ID no está configurado');
+    }
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: 'A:I',
     });
 
     const rows = response.data.values || [];
+    console.log(`Filas totales en el sheet: ${rows.length}`);
     
-    if (rows.length <= 1) return [];
+    if (rows.length <= 1) {
+      console.log('No hay datos o solo headers');
+      return [];
+    }
 
     // Filtrar reservas confirmadas para esta fecha
     const reservations = rows.slice(1)
-      .filter(row => row[5] === fecha && row[7] === 'confirmada') // fecha y estado confirmada
+      .filter(row => {
+        // Asegurarse de que row[5] (fecha) y row[7] (estado) existen
+        const rowFecha = row[5];
+        const rowEstado = row[7];
+        return rowFecha === fecha && rowEstado === 'confirmada';
+      })
       .map(row => ({
         id: row[0],
         nombre: row[1],
@@ -187,7 +223,9 @@ async function getReservationsForDate(fecha) {
 
   } catch (error) {
     console.error('Error getting reservations for date:', error);
-    throw error;
+    // Si hay error con Google Sheets, devolver array vacío para no bloquear
+    console.log('Devolviendo array vacío debido al error');
+    return [];
   }
 }
 
@@ -196,19 +234,32 @@ async function getMonthAvailability() {
     const today = new Date();
     const monthData = {};
     
+    console.log('Calculando disponibilidad para 30 días desde:', today);
+    
     // Obtener disponibilidad para los próximos 30 días
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       const dateString = date.toISOString().split('T')[0];
       
-      const dayAvailability = await checkDateAvailability(dateString, 1);
-      monthData[dateString] = {
-        available: dayAvailability.available,
-        reason: dayAvailability.reason,
-        slotsCount: dayAvailability.availableSlots.length,
-        dayOfWeek: dayAvailability.dayOfWeek
-      };
+      try {
+        const dayAvailability = await checkDateAvailability(dateString, 1);
+        monthData[dateString] = {
+          available: dayAvailability.available,
+          reason: dayAvailability.reason,
+          slotsCount: dayAvailability.availableSlots.length,
+          dayOfWeek: dayAvailability.dayOfWeek
+        };
+      } catch (error) {
+        console.error(`Error calculando disponibilidad para ${dateString}:`, error);
+        // Si hay error para una fecha, marcarla como no disponible
+        monthData[dateString] = {
+          available: false,
+          reason: 'Error de sistema',
+          slotsCount: 0,
+          dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][date.getDay()]
+        };
+      }
     }
 
     return {

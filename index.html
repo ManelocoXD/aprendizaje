@@ -902,16 +902,63 @@
         
         const response = await fetch('/api/disponibilidad');
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
+        console.log('Datos recibidos:', data);
         availabilityData = data;
         
         renderCalendar();
       } catch (error) {
         console.error('Error cargando disponibilidad:', error);
-        alert('Error al cargar la disponibilidad del calendario');
+        
+        // Fallback: crear datos básicos para mostrar el calendario
+        const today = new Date();
+        const fallbackData = {
+          month: today.getMonth() + 1,
+          year: today.getFullYear(),
+          availability: {},
+          restaurantConfig: {
+            openingHours: {
+              0: null,
+              1: { start: '12:00', end: '23:00' },
+              2: { start: '12:00', end: '23:00' },
+              3: { start: '12:00', end: '23:00' },
+              4: { start: '12:00', end: '23:00' },
+              5: { start: '12:00', end: '23:30' },
+              6: { start: '12:00', end: '23:30' }
+            },
+            maxCapacity: 50
+          }
+        };
+        
+        // Crear disponibilidad básica para los próximos 30 días
+        for (let i = 0; i < 30; i++) {
+          const date = new Date(today);
+          date.setDate(today.getDate() + i);
+          const dateString = date.toISOString().split('T')[0];
+          const dayOfWeek = date.getDay();
+          
+          fallbackData.availability[dateString] = {
+            available: dayOfWeek !== 0, // No disponible los domingos
+            reason: dayOfWeek === 0 ? 'Restaurante cerrado' : null,
+            slotsCount: dayOfWeek !== 0 ? 8 : 0,
+            dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dayOfWeek]
+          };
+        }
+        
+        availabilityData = fallbackData;
+        renderCalendar();
+        
+        // Mostrar mensaje de advertencia
+        console.warn('Usando datos de fallback debido a error en la API');
+        const messageDiv = document.createElement('div');
+        messageDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px;';
+        messageDiv.textContent = 'Aviso: Problemas de conexión. Los horarios mostrados son aproximados.';
+        document.querySelector('.form-container').prepend(messageDiv);
       }
     }
 
@@ -1028,10 +1075,13 @@
         
         const response = await fetch(`/api/disponibilidad?fecha=${selectedDate}&personas=${selectedPeople}`);
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
+        console.log('Datos de horarios recibidos:', data);
         renderTimeSlots(data);
         
         // Actualizar información de fecha seleccionada
@@ -1047,7 +1097,41 @@
         
       } catch (error) {
         console.error('Error cargando horarios:', error);
-        alert('Error al cargar los horarios disponibles');
+        
+        // Fallback: mostrar horarios básicos
+        const fallbackData = {
+          fecha: selectedDate,
+          available: true,
+          availableSlots: [
+            { time: '12:00', availableSpaces: 50, reservationsCount: 0 },
+            { time: '12:30', availableSpaces: 50, reservationsCount: 0 },
+            { time: '13:00', availableSpaces: 50, reservationsCount: 0 },
+            { time: '19:00', availableSpaces: 50, reservationsCount: 0 },
+            { time: '19:30', availableSpaces: 50, reservationsCount: 0 },
+            { time: '20:00', availableSpaces: 50, reservationsCount: 0 },
+            { time: '20:30', availableSpaces: 50, reservationsCount: 0 },
+            { time: '21:00', availableSpaces: 50, reservationsCount: 0 }
+          ]
+        };
+        
+        renderTimeSlots(fallbackData);
+        
+        // Actualizar información de fecha seleccionada
+        const dateObj = new Date(selectedDate + 'T00:00:00');
+        const options = { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        };
+        document.getElementById('selectedDateDisplay').textContent = 
+          dateObj.toLocaleDateString('es-ES', options);
+        
+        // Mostrar advertencia
+        const warningDiv = document.createElement('div');
+        warningDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px;';
+        warningDiv.textContent = 'Aviso: Problemas de conexión. Los horarios mostrados son aproximados.';
+        document.getElementById('step3').prepend(warningDiv);
       }
     }
 
