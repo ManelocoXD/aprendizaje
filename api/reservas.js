@@ -20,53 +20,132 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: 'v4', auth });
 
 module.exports = async (req, res) => {
-  if (req.method !== "GET") return res.status(405).end("Método no permitido");
+  // Configurar CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== "GET") return res.status(405).json({ error: "Método no permitido" });
 
   try {
-    console.log('Obteniendo reservas de Google Sheets...');
+    console.log('=== Iniciando obtención de reservas ===');
+    
+    // Verificar variables de entorno
+    if (!process.env.GOOGLE_SHEET_ID) {
+      console.error('ERROR: GOOGLE_SHEET_ID no está definido');
+      return res.status(500).json({ 
+        error: "Configuración del servidor incompleta",
+        details: "GOOGLE_SHEET_ID no está configurado"
+      });
+    }
 
+    if (!process.env.GOOGLE_CLIENT_EMAIL) {
+      console.error('ERROR: GOOGLE_CLIENT_EMAIL no está definido');
+      return res.status(500).json({ 
+        error: "Configuración del servidor incompleta",
+        details: "GOOGLE_CLIENT_EMAIL no está configurado"
+      });
+    }
+
+    console.log('Variables de entorno verificadas correctamente');
+    console.log('GOOGLE_SHEET_ID:', process.env.GOOGLE_SHEET_ID);
+    console.log('GOOGLE_CLIENT_EMAIL:', process.env.GOOGLE_CLIENT_EMAIL);
+
+    console.log('Obteniendo datos de Google Sheets...');
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
       range: 'A:I', // Todas las columnas
     });
 
+    console.log('Respuesta recibida de Google Sheets');
     const rows = response.data.values || [];
+    console.log(`Total de filas encontradas: ${rows.length}`);
 
     if (rows.length <= 1) {
-      console.log('No hay reservas en el sheet');
+      console.log('No hay reservas en el sheet (solo headers o vacío)');
       return res.status(200).json([]);
     }
 
+    // Log de la primera fila (headers)
+    console.log('Headers:', rows[0]);
+
     // Convertir filas a objetos (saltear header)
-    const reservas = rows.slice(1).map((row, index) => ({
-      id: row[0] || index + 1,
-      nombre: row[1] || '',
-      telefono: row[2] || '',
-      email: row[3] || null,
-      personas: parseInt(row[4]) || 0,
-      fecha: row[5] || '',
-      hora: row[6] || '',
-      estado: row[7] || 'pendiente',
-      created_at: row[8] || '',
-      rowIndex: index + 2 // +2 porque sheet empieza en 1 y saltamos header
-    })).filter(reserva => reserva.nombre); // Filtrar filas vacías
+    const reservas = rows.slice(1)
+      .map((row, index) => {
+        try {
+          return {
+            id: row[0] || (index + 1).toString(),
+            nombre: row[1] || '',
+            telefono: row[2] || '',
+            email: row[3] || '',
+            personas: parseInt(row[4]) || 0,
+            fecha: row[5] || '',
+            hora: row[6] || '',
+            estado: row[7] || 'pendiente',
+            created_at: row[8] || '',
+            rowIndex: index + 2 // +2 porque sheet empieza en 1 y saltamos header
+          };
+        } catch (error) {
+          console.error(`Error procesando fila ${index + 2}:`, error);
+          return null;
+        }
+      })
+      .filter(reserva => reserva && reserva.nombre); // Filtrar filas vacías o con error
+
+    console.log(`Reservas procesadas: ${reservas.length}`);
 
     // Ordenar por fecha y hora
     reservas.sort((a, b) => {
-      if (a.fecha !== b.fecha) {
-        return new Date(a.fecha) - new Date(b.fecha);
+      try {
+        if (a.fecha !== b.fecha) {
+          return new Date(a.fecha) - new Date(b.fecha);
+        }
+        return a.hora.localeCompare(b.hora);
+      } catch (error) {
+        console.error('Error ordenando reservas:', error);
+        return 0;
       }
-      return a.hora.localeCompare(b.hora);
     });
 
     console.log(`${reservas.length} reservas obtenidas exitosamente`);
+    
+    // Log de las primeras 3 reservas para debug
+    if (reservas.length > 0) {
+      console.log('Primeras reservas:', reservas.slice(0, 3));
+    }
+
     res.status(200).json(reservas);
 
   } catch (err) {
-    console.error("Error al obtener reservas:", err);
+    console.error("=== ERROR al obtener reservas ===");
+    console.error("Tipo de error:", err.name);
+    console.error("Mensaje:", err.message);
+    console.error("Stack:", err.stack);
+    
+    // Proporcionar información más detallada del error
+    let errorDetails = err.message;
+    let errorType = 'Error desconocido';
+
+    if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNREFUSED')) {
+      errorType = 'Error de conexión';
+      errorDetails = 'No se puede conectar con Google Sheets. Verifica tu conexión a internet.';
+    } else if (err.message.includes('invalid_grant')) {
+      errorType = 'Error de autenticación';
+      errorDetails = 'Las credenciales de Google no son válidas. Verifica las variables de entorno.';
+    } else if (err.message.includes('Requested entity was not found')) {
+      errorType = 'Hoja no encontrada';
+      errorDetails = 'La hoja de cálculo de Google no existe o no tiene permisos correctos.';
+    } else if (err.code === 403) {
+      errorType = 'Permisos insuficientes';
+      errorDetails = 'La cuenta de servicio no tiene permisos para acceder a la hoja.';
+    }
+
     res.status(500).json({ 
       error: "Error al obtener reservas de Google Sheets",
-      details: err.message 
+      errorType: errorType,
+      details: errorDetails,
+      technical: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };

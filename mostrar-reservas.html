@@ -971,12 +971,20 @@
         console.log('Cargando reservas...');
         const response = await fetch('/api/reservas');
         
+        let errorInfo = null;
+        
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          // Intentar obtener información del error del servidor
+          try {
+            errorInfo = await response.json();
+          } catch (e) {
+            errorInfo = { error: `HTTP error! status: ${response.status}` };
+          }
+          throw new Error(errorInfo.details || errorInfo.error || `HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
-        console.log('Reservas cargadas:', data);
+        console.log('Reservas cargadas:', data.length, 'reservas');
         
         allReservations = data;
         
@@ -993,12 +1001,21 @@
         applyFilters();
         
       } catch (error) {
-        console.error('Error al cargar reservas:', error);
+        console.error('Error completo al cargar reservas:', error);
         document.getElementById('loading').innerHTML = `
-          <div style="color: #dc3545;">
+          <div style="color: #dc3545; padding: 40px; text-align: center;">
             <h3>❌ Error al cargar reservas</h3>
-            <p>${error.message}</p>
-            <button class="refresh-btn" onclick="cargarReservas()" style="margin-top: 20px;">
+            <p style="margin: 20px 0; font-size: 16px;">${error.message}</p>
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 600px; text-align: left;">
+              <strong>Posibles causas:</strong>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Las credenciales de Google Sheets no están configuradas correctamente</li>
+                <li>La hoja de cálculo no existe o no tiene los permisos correctos</li>
+                <li>Problema de conexión con Google Sheets</li>
+                <li>Variables de entorno faltantes en Vercel</li>
+              </ul>
+            </div>
+            <button class="refresh-btn" onclick="cargarReservas()" style="margin-top: 20px; max-width: 300px;">
               🔄 Reintentar
             </button>
           </div>
