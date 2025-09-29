@@ -524,14 +524,14 @@
         </div>
         
         <div class="calendar-grid" id="calendarGrid">
-          <!-- Headers de días -->
-          <div class="calendar-day-header">Dom</div>
+          <!-- Headers de días CORREGIDOS -->
           <div class="calendar-day-header">Lun</div>
           <div class="calendar-day-header">Mar</div>
           <div class="calendar-day-header">Mié</div>
           <div class="calendar-day-header">Jue</div>
           <div class="calendar-day-header">Vie</div>
           <div class="calendar-day-header">Sáb</div>
+          <div class="calendar-day-header">Dom</div>
         </div>
       </div>
 
@@ -701,7 +701,11 @@
       // Calcular primer día del mes
       const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-      const startDate = firstDay.getDay(); // 0 = Domingo
+      
+      // CORRECCIÓN: Ajustar para que domingo sea el último día (6) en lugar del primero (0)
+      let startDate = firstDay.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+      startDate = startDate === 0 ? 6 : startDate - 1; // Convertir: Dom(0)→6, Lun(1)→0, Mar(2)→1, etc.
+      
       const today = new Date().toISOString().split('T')[0];
 
       // Espacios vacíos al inicio
@@ -750,7 +754,7 @@
             applyFilters();
           }
           
-          console.log('Fecha seleccionada:', selectedDate);
+          console.log('Fecha seleccionada:', selectedDate, 'Día de la semana real:', date.toLocaleDateString('es-ES', { weekday: 'long' }));
         });
 
         calendarGrid.appendChild(dayBtn);
@@ -927,36 +931,36 @@
     }
 
     async function confirmCancel() {
-  if (!cancelingReservation) return;
-  
-  try {
-    console.log('Cancelando reserva ID:', cancelingReservation.id);
-    
-    // RUTA CORREGIDA: Ahora coincide con la estructura de archivos
-    const response = await fetch(`/api/${cancelingReservation.id}/cancelar`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
+      if (!cancelingReservation) return;
+      
+      try {
+        console.log('Cancelando reserva ID:', cancelingReservation.id);
+        
+        // RUTA CORREGIDA: Ahora coincide con la estructura de archivos
+        const response = await fetch(`/api/${cancelingReservation.id}/cancelar`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Resultado:', result);
+          alert('✅ Reserva cancelada exitosamente');
+          closeCancelModal();
+          cargarReservas(); // Recargar datos
+        } else {
+          const errorData = await response.json();
+          console.error('Error response:', errorData);
+          alert('❌ Error al cancelar la reserva: ' + (errorData.error || 'Error desconocido'));
+        }
+        
+      } catch (error) {
+        console.error('Error al cancelar reserva:', error);
+        alert('❌ Error al cancelar la reserva: ' + error.message);
       }
-    });
-    
-    if (response.ok) {
-      const result = await response.json();
-      console.log('Resultado:', result);
-      alert('✅ Reserva cancelada exitosamente');
-      closeCancelModal();
-      cargarReservas(); // Recargar datos
-    } else {
-      const errorData = await response.json();
-      console.error('Error response:', errorData);
-      alert('❌ Error al cancelar la reserva: ' + (errorData.error || 'Error desconocido'));
     }
-    
-  } catch (error) {
-    console.error('Error al cancelar reserva:', error);
-    alert('❌ Error al cancelar la reserva: ' + error.message);
-  }
-}
 
     async function cargarReservas() {
       try {
