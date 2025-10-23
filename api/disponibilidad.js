@@ -97,10 +97,11 @@ async function checkDateAvailability(fecha, personas) {
   try {
     console.log(`Consultando disponibilidad para ${fecha}, ${personas} personas`);
 
-    // --- INICIO CORRECCIÓN DE TIMEZONE ---
-    // Forzamos la fecha a UTC para compararla
-    const date = new Date(fecha + 'T00:00:00Z'); 
-    if (isNaN(date)) {
+    // Crear objeto Date en UTC para evitar problemas de zona horaria
+    const dateParts = fecha.split('-');
+    const date = new Date(Date.UTC(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2])));
+    
+    if (isNaN(date.getTime())) {
       console.log('Fecha inválida:', fecha);
       return {
         fecha,
@@ -110,12 +111,12 @@ async function checkDateAvailability(fecha, personas) {
       };
     }
 
-    // Obtenemos la fecha "hoy" del servidor (UTC) como string YYYY-MM-DD
-    const today = new Date();
-    const todayString = today.toISOString().split('T')[0];
+    // Obtener fecha actual del servidor en UTC
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-    // Comparamos strings de fecha (seguro contra timezones)
-    if (fecha < todayString) {
+    // Comparar fechas
+    if (date < todayUTC) {
       return {
         fecha,
         available: false,
@@ -124,10 +125,8 @@ async function checkDateAvailability(fecha, personas) {
       };
     }
 
-    // Usamos getUTCDay() (0=Dom, 1=Lun...) porque 'date' es un objeto UTC
-    const dayOfWeek = date.getUTCDay(); 
-    // --- FIN CORRECCIÓN DE TIMEZONE ---
-    
+    // Día de la semana en UTC (0=Domingo, 6=Sábado)
+    const dayOfWeek = date.getUTCDay();
     console.log('Día de la semana (UTC):', dayOfWeek);
     
     if (!RESTAURANT_CONFIG.openingHours[dayOfWeek]) {
@@ -158,7 +157,6 @@ async function checkDateAvailability(fecha, personas) {
     const openingHours = RESTAURANT_CONFIG.openingHours[dayOfWeek];
     
     for (const timeSlot of RESTAURANT_CONFIG.timeSlots) {
-      // Verificar si el horario está dentro del horario de apertura
       if (timeSlot >= openingHours.start && timeSlot <= openingHours.end) {
         const reservationsAtThisTime = existingReservations.filter(r => r.hora === timeSlot);
         const totalPeopleAtThisTime = reservationsAtThisTime.reduce((sum, r) => sum + r.personas, 0);
@@ -244,20 +242,18 @@ async function getReservationsForDate(fecha) {
 
 async function getMonthAvailability() {
   try {
-    const today = new Date();
-    // --- CORRECCIÓN DE TIMEZONE ---
-    // Esta es la fecha "hoy" del servidor (UTC), que enviaremos al cliente.
-    const serverTodayString = today.toISOString().split('T')[0];
-    // --- FIN CORRECCIÓN ---
+    const now = new Date();
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayString = todayUTC.toISOString().split('T')[0];
     
     const monthData = {};
     
-    console.log('Calculando disponibilidad para 30 días desde (UTC):', serverTodayString);
+    console.log('Calculando disponibilidad para 30 días desde (UTC):', todayString);
     
     // Obtener disponibilidad para los próximos 30 días
     for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setUTCDate(today.getUTCDate() + i); // Operar en UTC
+      const date = new Date(todayUTC);
+      date.setUTCDate(todayUTC.getUTCDate() + i);
       const dateString = date.toISOString().split('T')[0];
       
       try {
@@ -280,10 +276,10 @@ async function getMonthAvailability() {
     }
 
     return {
-      month: today.getUTCMonth() + 1, // Mes UTC
-      year: today.getUTCFullYear(), // Año UTC
+      month: todayUTC.getUTCMonth() + 1,
+      year: todayUTC.getUTCFullYear(),
       availability: monthData,
-      serverToday: serverTodayString, // <-- CORRECCIÓN: Enviamos la fecha UTC "hoy" al cliente
+      serverToday: todayString,
       restaurantConfig: {
         openingHours: RESTAURANT_CONFIG.openingHours,
         maxCapacity: RESTAURANT_CONFIG.maxCapacity

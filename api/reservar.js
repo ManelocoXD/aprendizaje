@@ -58,9 +58,12 @@ module.exports = async (req, res) => {
     ];
 
     // Insertar en Google Sheets
+    const sheetName = process.env.GOOGLE_SHEET_NAME || 'Reservas';
+    
+    // Insertar en Google Sheets
     const request = {
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: `'${sheetName}'!A:I`, // CORRECCIÓN: Usar nombre de la hoja
+      range: `'${sheetName}'!A:I`,
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {

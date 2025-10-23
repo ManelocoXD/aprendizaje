@@ -53,9 +53,13 @@ module.exports = async (req, res) => {
     console.log('GOOGLE_CLIENT_EMAIL:', process.env.GOOGLE_CLIENT_EMAIL);
 
     console.log('Obteniendo datos de Google Sheets...');
+    
+    // CORRECCIÓN: Obtener nombre de la hoja
+    const sheetName = process.env.GOOGLE_SHEET_NAME || 'Reservas';
+    
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'A:I', // Todas las columnas
+      range: `'${sheetName}'!A:I`,
     });
 
     console.log('Respuesta recibida de Google Sheets');
@@ -118,12 +122,25 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error("=== ERROR al obtener reservas ===");
+    console.error("Tipo de error:", err.name);
+    console.error("Mensaje:", err.message);
+    
     let errorDetails = err.message;
     let errorType = 'Error desconocido';
 
     if (err.message.includes("Unable to parse range")) {
       errorType = 'Nombre de Hoja incorrecto';
-      errorDetails = `La hoja llamada "${process.env.GOOGLE_SHEET_NAME}" no se encontró. Verifica la variable de entorno GOOGLE_SHEET_NAME.`;
+      const sheetName = process.env.GOOGLE_SHEET_NAME || 'Reservas';
+      errorDetails = `La hoja llamada "${sheetName}" no se encontró. Verifica que exista en tu Google Sheet y que GOOGLE_SHEET_NAME esté correctamente configurado en las variables de entorno.`;
+    } else if (err.message.includes('ENOTFOUND') || err.message.includes('ECONNREFUSED')) {
+      errorType = 'Error de conexión';
+      errorDetails = 'No se puede conectar con Google Sheets. Verifica tu conexión a internet.';
+    } else if (err.message.includes('invalid_grant')) {
+      errorType = 'Error de autenticación';
+      errorDetails = 'Las credenciales de Google no son válidas. Verifica las variables de entorno.';
+    } else if (err.message.includes('Requested entity was not found')) {
+      errorType = 'Hoja no encontrada';
+      errorDetails = 'La hoja de cálculo de Google no existe o no tiene permisos correctos.';
     } else if (err.code === 403) {
       errorType = 'Permisos insuficientes';
       errorDetails = 'La cuenta de servicio no tiene permisos para acceder a la hoja.';
@@ -132,7 +149,8 @@ module.exports = async (req, res) => {
     res.status(500).json({ 
       error: "Error al obtener reservas de Google Sheets",
       errorType: errorType,
-      details: errorDetails
+      details: errorDetails,
+      technical: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
