@@ -685,81 +685,91 @@
     }
 
     function renderCalendar() {
-      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-      
-      document.getElementById('calendarTitle').textContent = 
-        `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  
+  document.getElementById('calendarTitle').textContent = 
+    `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
 
-      const calendarGrid = document.getElementById('calendarGrid');
-      
-      // Limpiar grid (mantener headers)
-      const headers = calendarGrid.querySelectorAll('.calendar-day-header');
-      calendarGrid.innerHTML = '';
-      headers.forEach(header => calendarGrid.appendChild(header));
+  const calendarGrid = document.getElementById('calendarGrid');
+  
+  // Limpiar grid (mantener headers)
+  const headers = calendarGrid.querySelectorAll('.calendar-day-header');
+  calendarGrid.innerHTML = '';
+  headers.forEach(header => calendarGrid.appendChild(header));
 
-      // Calcular primer día del mes
-      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-      const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-      
-      // CORRECCIÓN: Ajustar para que domingo sea el último día (6) en lugar del primero (0)
-      let startDate = firstDay.getDay(); // 0 = Domingo, 1 = Lunes, etc.
-      startDate = startDate === 0 ? 6 : startDate - 1; // Convertir: Dom(0)→6, Lun(1)→0, Mar(2)→1, etc.
-      
-      const today = new Date().toISOString().split('T')[0];
+  // Calcular primer día del mes
+  const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  
+  // CORRECCIÓN: getDay() devuelve 0=Dom, 1=Lun, 2=Mar... 6=Sáb
+  // Nuestro grid es Lun-Dom, así que ajustamos:
+  let startDay = firstDay.getDay();
+  // Convertir de Dom(0)-Sáb(6) a Lun(0)-Dom(6)
+  startDay = (startDay === 0) ? 6 : startDay - 1;
+  
+  const today = new Date().toISOString().split('T')[0];
 
-      // Espacios vacíos al inicio
-      for (let i = 0; i < startDate; i++) {
-        const emptyDiv = document.createElement('div');
-        emptyDiv.className = 'calendar-day empty';
-        calendarGrid.appendChild(emptyDiv);
-      }
+  // Espacios vacíos al inicio
+  for (let i = 0; i < startDay; i++) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.className = 'calendar-day empty';
+    calendarGrid.appendChild(emptyDiv);
+  }
 
-      // Días del mes
-      for (let day = 1; day <= lastDay.getDate(); day++) {
-        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-        const dateString = date.toISOString().split('T')[0];
-        
-        const dayBtn = document.createElement('div');
-        dayBtn.className = 'calendar-day';
-        dayBtn.textContent = day;
-        
-        // Determinar estado del día
-        if (dateString === today) {
-          dayBtn.classList.add('today');
-        }
-
-        if (dateString === selectedDate) {
-          dayBtn.classList.add('selected');
-        }
-
-        // Marcar días con reservas
-        if (reservationDates.has(dateString)) {
-          dayBtn.classList.add('has-reservations');
-        }
-
-        // Event listener para selección
-        dayBtn.addEventListener('click', function() {
-          // Remover selección anterior
-          document.querySelectorAll('.calendar-day').forEach(btn => {
-            btn.classList.remove('selected');
-          });
-          
-          // Seleccionar actual
-          this.classList.add('selected');
-          selectedDate = dateString;
-          
-          // Si el filtro actual es "selected", aplicar filtros
-          if (currentFilter === 'selected') {
-            applyFilters();
-          }
-          
-          console.log('Fecha seleccionada:', selectedDate, 'Día de la semana real:', date.toLocaleDateString('es-ES', { weekday: 'long' }));
-        });
-
-        calendarGrid.appendChild(dayBtn);
-      }
+  // Días del mes
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const dateString = date.toISOString().split('T')[0];
+    
+    const dayBtn = document.createElement('div');
+    dayBtn.className = 'calendar-day';
+    dayBtn.textContent = day;
+    
+    // Determinar estado del día
+    if (dateString === today) {
+      dayBtn.classList.add('today');
     }
+
+    if (dateString === selectedDate) {
+      dayBtn.classList.add('selected');
+    }
+
+    // Marcar días con reservas
+    if (reservationDates.has(dateString)) {
+      dayBtn.classList.add('has-reservations');
+    }
+
+    // Event listener para selección
+    dayBtn.addEventListener('click', function() {
+      // Remover selección anterior
+      document.querySelectorAll('.calendar-day').forEach(btn => {
+        btn.classList.remove('selected');
+      });
+      
+      // Seleccionar actual
+      this.classList.add('selected');
+      selectedDate = dateString;
+      
+      // Si el filtro actual es "selected", aplicar filtros
+      if (currentFilter === 'selected') {
+        applyFilters();
+      }
+      
+      // LOG para verificar
+      console.log('Fecha seleccionada:', selectedDate);
+      console.log('Día de la semana:', date.toLocaleDateString('es-ES', { weekday: 'long' }));
+      console.log('Verificación completa:', date.toLocaleDateString('es-ES', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }));
+    });
+
+    calendarGrid.appendChild(dayBtn);
+  }
+}
 
     function previousMonth() {
       const newMonth = new Date(currentMonth);
