@@ -943,10 +943,10 @@
           const dayOfWeek = date.getDay();
           
           fallbackData.availability[dateString] = {
-            available: dayOfWeek !== 6, // No disponible los domingos
-            reason: dayOfWeek === 6 ? 'Restaurante cerrado' : null,
+            available: dayOfWeek !== 0, // No disponible los domingos
+            reason: dayOfWeek === 0 ? 'Restaurante cerrado' : null,
             slotsCount: dayOfWeek !== 0 ? 8 : 0,
-            dayOfWeek: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'][dayOfWeek]
+            dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dayOfWeek]
           };
         }
         
@@ -980,12 +980,16 @@
       // Calcular primer día del mes
       const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
       const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-      const startDate = firstDay.getDay(); // 0 = Domingo
+      
+      // CORRECCIÓN: Ajustar el día de inicio para grid Lun-Dom
+      let startDay = firstDay.getDay(); // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+      startDay = (startDay === 0) ? 6 : startDay - 1; // Convertir: Dom→6, Lun→0, Mar→1, etc.
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       // Espacios vacíos al inicio
-      for (let i = 0; i < startDate; i++) {
+      for (let i = 0; i < startDay; i++) {
         const emptyDiv = document.createElement('div');
         dateGrid.appendChild(emptyDiv);
       }
@@ -1032,7 +1036,7 @@
             document.getElementById('dateNextBtn').disabled = false;
             hideError('fechaError');
             
-            console.log('Fecha seleccionada:', selectedDate);
+            console.log('Fecha seleccionada:', selectedDate, '- Día:', date.toLocaleDateString('es-ES', { weekday: 'long' }));
           });
         }
 
