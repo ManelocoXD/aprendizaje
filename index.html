@@ -964,85 +964,95 @@
 
     // Renderizar calendario
     function renderCalendar() {
-      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                         'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-      
-      document.getElementById('monthTitle').textContent = 
-        `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  
+  document.getElementById('monthTitle').textContent = 
+    `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
 
-      const dateGrid = document.getElementById('dateGrid');
-      
-      // Limpiar grid (mantener headers)
-      const headers = dateGrid.querySelectorAll('.date-header');
-      dateGrid.innerHTML = '';
-      headers.forEach(header => dateGrid.appendChild(header));
+  const dateGrid = document.getElementById('dateGrid');
+  
+  // Limpiar grid (mantener headers)
+  const headers = dateGrid.querySelectorAll('.date-header');
+  dateGrid.innerHTML = '';
+  headers.forEach(header => dateGrid.appendChild(header));
 
-      // Calcular primer día del mes
-      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-      const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-      
-      // CORRECCIÓN: Ajustar el día de inicio para grid Lun-Dom
-      let startDay = firstDay.getDay(); // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
-      startDay = (startDay === 0) ? 6 : startDay - 1; // Convertir: Dom→6, Lun→0, Mar→1, etc.
-      
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+  // Calcular primer y último día del mes
+  const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  
+  // CORRECCIÓN CRÍTICA:
+  // getDay() devuelve: 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+  // Nuestro grid HTML tiene headers: Lun, Mar, Mié, Jue, Vie, Sáb, Dom
+  // Necesitamos convertir para que Lun=0, Mar=1... Dom=6
+  let startDay = firstDay.getDay();
+  startDay = (startDay === 0) ? 6 : startDay - 1;
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-      // Espacios vacíos al inicio
-      for (let i = 0; i < startDay; i++) {
-        const emptyDiv = document.createElement('div');
-        dateGrid.appendChild(emptyDiv);
-      }
+  // Espacios vacíos al inicio
+  for (let i = 0; i < startDay; i++) {
+    const emptyDiv = document.createElement('div');
+    dateGrid.appendChild(emptyDiv);
+  }
 
-      // Días del mes
-      for (let day = 1; day <= lastDay.getDate(); day++) {
-        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-        const dateString = date.toISOString().split('T')[0];
-        
-        const dateBtn = document.createElement('div');
-        dateBtn.className = 'date-btn';
-        dateBtn.textContent = day;
-        
-        // Determinar estado del día
-        if (date < today) {
-          dateBtn.classList.add('disabled');
-        } else if (date.toDateString() === today.toDateString()) {
-          dateBtn.classList.add('today');
-        }
+  // Días del mes
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const dateString = date.toISOString().split('T')[0];
+    
+    const dateBtn = document.createElement('div');
+    dateBtn.className = 'date-btn';
+    dateBtn.textContent = day;
+    
+    // Determinar estado del día
+    if (date < today) {
+      dateBtn.classList.add('disabled');
+    } else if (date.toDateString() === today.toDateString()) {
+      dateBtn.classList.add('today');
+    }
 
-        // Verificar disponibilidad
-        const availability = availabilityData.availability && availabilityData.availability[dateString];
-        if (availability) {
-          if (availability.available) {
-            dateBtn.classList.add('available');
-          } else {
-            dateBtn.classList.add('unavailable');
-          }
-        }
-
-        // Event listener para selección
-        if (!dateBtn.classList.contains('disabled') && !dateBtn.classList.contains('unavailable')) {
-          dateBtn.addEventListener('click', function() {
-            // Remover selección anterior
-            document.querySelectorAll('.date-btn').forEach(btn => {
-              btn.classList.remove('selected');
-            });
-            
-            // Seleccionar actual
-            this.classList.add('selected');
-            selectedDate = dateString;
-            
-            // Habilitar botón siguiente
-            document.getElementById('dateNextBtn').disabled = false;
-            hideError('fechaError');
-            
-            console.log('Fecha seleccionada:', selectedDate, '- Día:', date.toLocaleDateString('es-ES', { weekday: 'long' }));
-          });
-        }
-
-        dateGrid.appendChild(dateBtn);
+    // Verificar disponibilidad
+    const availability = availabilityData.availability && availabilityData.availability[dateString];
+    if (availability) {
+      if (availability.available) {
+        dateBtn.classList.add('available');
+      } else {
+        dateBtn.classList.add('unavailable');
       }
     }
+
+    // Event listener para selección
+    if (!dateBtn.classList.contains('disabled') && !dateBtn.classList.contains('unavailable')) {
+      dateBtn.addEventListener('click', function() {
+        // Remover selección anterior
+        document.querySelectorAll('.date-btn').forEach(btn => {
+          btn.classList.remove('selected');
+        });
+        
+        // Seleccionar actual
+        this.classList.add('selected');
+        selectedDate = dateString;
+        
+        // Habilitar botón siguiente
+        document.getElementById('dateNextBtn').disabled = false;
+        hideError('fechaError');
+        
+        // LOG para verificar que la fecha es correcta
+        console.log('✅ Fecha seleccionada:', selectedDate);
+        console.log('📅 Día completo:', date.toLocaleDateString('es-ES', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }));
+      });
+    }
+
+    dateGrid.appendChild(dateBtn);
+  }
+}
 
     // Navegación de meses
     function previousMonth() {

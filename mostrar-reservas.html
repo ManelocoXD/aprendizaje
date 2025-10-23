@@ -698,14 +698,15 @@
   calendarGrid.innerHTML = '';
   headers.forEach(header => calendarGrid.appendChild(header));
 
-  // Calcular primer día del mes
+  // Calcular primer y último día del mes
   const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
   const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
   
-  // CORRECCIÓN: getDay() devuelve 0=Dom, 1=Lun, 2=Mar... 6=Sáb
-  // Nuestro grid es Lun-Dom, así que ajustamos:
+  // CORRECCIÓN CRÍTICA:
+  // getDay() devuelve: 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+  // Nuestro grid HTML tiene headers: Lun, Mar, Mié, Jue, Vie, Sáb, Dom
+  // Necesitamos convertir para que Lun=0, Mar=1... Dom=6
   let startDay = firstDay.getDay();
-  // Convertir de Dom(0)-Sáb(6) a Lun(0)-Dom(6)
   startDay = (startDay === 0) ? 6 : startDay - 1;
   
   const today = new Date().toISOString().split('T')[0];
@@ -756,10 +757,9 @@
         applyFilters();
       }
       
-      // LOG para verificar
-      console.log('Fecha seleccionada:', selectedDate);
-      console.log('Día de la semana:', date.toLocaleDateString('es-ES', { weekday: 'long' }));
-      console.log('Verificación completa:', date.toLocaleDateString('es-ES', { 
+      // LOG para verificar que la fecha es correcta
+      console.log('✅ Fecha seleccionada:', selectedDate);
+      console.log('📅 Día completo:', date.toLocaleDateString('es-ES', { 
         weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
