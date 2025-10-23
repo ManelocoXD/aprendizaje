@@ -57,6 +57,15 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Método no permitido" });
 
+  // CORRECCIÓN: Validar que el nombre de la hoja esté configurado
+  if (!process.env.GOOGLE_SHEET_ID || !process.env.GOOGLE_SHEET_NAME) {
+    console.error('Error: GOOGLE_SHEET_ID o GOOGLE_SHEET_NAME no están configurados.');
+    return res.status(500).json({ 
+      error: "Error de configuración del servidor",
+      details: "Faltan variables de entorno para Google Sheets."
+    });
+  }
+
   const { fecha, personas } = req.query;
 
   try {
@@ -88,8 +97,9 @@ async function checkDateAvailability(fecha, personas) {
   try {
     console.log(`Consultando disponibilidad para ${fecha}, ${personas} personas`);
 
-    // Verificar si es una fecha válida
-    const date = new Date(fecha + 'T00:00:00');
+    // --- INICIO CORRECCIÓN DE TIMEZONE ---
+    // Forzamos la fecha a UTC para compararla
+    const date = new Date(fecha + 'T00:00:00Z'); 
     if (isNaN(date)) {
       console.log('Fecha inválida:', fecha);
       return {
@@ -100,10 +110,12 @@ async function checkDateAvailability(fecha, personas) {
       };
     }
 
+    // Obtenemos la fecha "hoy" del servidor (UTC) como string YYYY-MM-DD
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayString = today.toISOString().split('T')[0];
 
-    if (date < today) {
+    // Comparamos strings de fecha (seguro contra timezones)
+    if (fecha < todayString) {
       return {
         fecha,
         available: false,
@@ -112,9 +124,11 @@ async function checkDateAvailability(fecha, personas) {
       };
     }
 
-    // Verificar si está cerrado ese día
-    const dayOfWeek = date.getDay();
-    console.log('Día de la semana:', dayOfWeek);
+    // Usamos getUTCDay() (0=Dom, 1=Lun...) porque 'date' es un objeto UTC
+    const dayOfWeek = date.getUTCDay(); 
+    // --- FIN CORRECCIÓN DE TIMEZONE ---
+    
+    console.log('Día de la semana (UTC):', dayOfWeek);
     
     if (!RESTAURANT_CONFIG.openingHours[dayOfWeek]) {
       return {
@@ -181,14 +195,15 @@ async function getReservationsForDate(fecha) {
   try {
     console.log('Obteniendo reservas para fecha:', fecha);
     
-    // Verificar que tenemos todas las variables de entorno necesarias
-    if (!process.env.GOOGLE_SHEET_ID) {
-      throw new Error('GOOGLE_SHEET_ID no está configurado');
+    // CORRECCIÓN: Usar el nombre de la hoja
+    const sheetName = process.env.GOOGLE_SHEET_NAME;
+    if (!process.env.GOOGLE_SHEET_ID || !sheetName) {
+      throw new Error('GOOGLE_SHEET_ID o GOOGLE_SHEET_NAME no están configurados');
     }
     
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'A:I',
+      range: `'${sheetName}'!A:I`, // Usar nombre de la hoja
     });
 
     const rows = response.data.values || [];
@@ -202,7 +217,6 @@ async function getReservationsForDate(fecha) {
     // Filtrar reservas confirmadas para esta fecha
     const reservations = rows.slice(1)
       .filter(row => {
-        // Asegurarse de que row[5] (fecha) y row[7] (estado) existen
         const rowFecha = row[5];
         const rowEstado = row[7];
         return rowFecha === fecha && rowEstado === 'confirmada';
@@ -223,7 +237,6 @@ async function getReservationsForDate(fecha) {
 
   } catch (error) {
     console.error('Error getting reservations for date:', error);
-    // Si hay error con Google Sheets, devolver array vacío para no bloquear
     console.log('Devolviendo array vacío debido al error');
     return [];
   }
@@ -232,14 +245,19 @@ async function getReservationsForDate(fecha) {
 async function getMonthAvailability() {
   try {
     const today = new Date();
+    // --- CORRECCIÓN DE TIMEZONE ---
+    // Esta es la fecha "hoy" del servidor (UTC), que enviaremos al cliente.
+    const serverTodayString = today.toISOString().split('T')[0];
+    // --- FIN CORRECCIÓN ---
+    
     const monthData = {};
     
-    console.log('Calculando disponibilidad para 30 días desde:', today);
+    console.log('Calculando disponibilidad para 30 días desde (UTC):', serverTodayString);
     
     // Obtener disponibilidad para los próximos 30 días
     for (let i = 0; i < 30; i++) {
       const date = new Date(today);
-      date.setDate(today.getDate() + i);
+      date.setUTCDate(today.getUTCDate() + i); // Operar en UTC
       const dateString = date.toISOString().split('T')[0];
       
       try {
@@ -252,20 +270,20 @@ async function getMonthAvailability() {
         };
       } catch (error) {
         console.error(`Error calculando disponibilidad para ${dateString}:`, error);
-        // Si hay error para una fecha, marcarla como no disponible
         monthData[dateString] = {
           available: false,
           reason: 'Error de sistema',
           slotsCount: 0,
-          dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][date.getDay()]
+          dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][date.getUTCDay()]
         };
       }
     }
 
     return {
-      month: today.getMonth() + 1,
-      year: today.getFullYear(),
+      month: today.getUTCMonth() + 1, // Mes UTC
+      year: today.getUTCFullYear(), // Año UTC
       availability: monthData,
+      serverToday: serverTodayString, // <-- CORRECCIÓN: Enviamos la fecha UTC "hoy" al cliente
       restaurantConfig: {
         openingHours: RESTAURANT_CONFIG.openingHours,
         maxCapacity: RESTAURANT_CONFIG.maxCapacity

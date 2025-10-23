@@ -42,7 +42,7 @@ module.exports = async (req, res) => {
     // Obtener el siguiente ID
     const nextId = await getNextId();
 
-    // Preparar los datos para insertar - ESTADO: "confirmada" directamente
+    // Preparar los datos para insertar
     const values = [
       [
         nextId, // ID
@@ -52,7 +52,7 @@ module.exports = async (req, res) => {
         parseInt(personas),
         fecha,
         hora,
-        'confirmada', // ← Cambiado de 'pendiente' a 'confirmada'
+        'confirmada', 
         new Date().toISOString()
       ]
     ];
@@ -60,7 +60,7 @@ module.exports = async (req, res) => {
     // Insertar en Google Sheets
     const request = {
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'A:I', // Rango que incluye todas las columnas
+      range: `'${sheetName}'!A:I`, // CORRECCIÓN: Usar nombre de la hoja
       valueInputOption: 'RAW',
       insertDataOption: 'INSERT_ROWS',
       resource: {
@@ -92,10 +92,11 @@ async function checkAvailability(fecha, hora, personas) {
   try {
     console.log(`Verificando disponibilidad final para ${fecha} ${hora} - ${personas} personas`);
     
-    // Obtener reservas confirmadas para esta fecha y hora
+    // CORRECCIÓN: Usar nombre de la hoja
+    const sheetName = process.env.GOOGLE_SHEET_NAME;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'A:I',
+      range: `'${sheetName}'!A:I`,
     });
 
     const rows = response.data.values || [];
@@ -129,27 +130,25 @@ async function checkAvailability(fecha, hora, personas) {
 
   } catch (error) {
     console.error('Error verificando disponibilidad:', error);
-    // En caso de error, permitir la reserva (fallback conservativo)
     return true;
   }
 }
 
 async function getNextId() {
   try {
-    // Obtener todas las filas para calcular el siguiente ID
+    // CORRECCIÓN: Usar nombre de la hoja
+    const sheetName = process.env.GOOGLE_SHEET_NAME;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'A:A', // Solo la columna ID
+      range: `'${sheetName}'!A:A`, // Solo la columna ID
     });
 
     const rows = response.data.values || [];
     
-    // Si solo hay headers o está vacío, empezar desde 1
     if (rows.length <= 1) {
       return 1;
     }
 
-    // Encontrar el ID más alto y sumar 1
     let maxId = 0;
     for (let i = 1; i < rows.length; i++) { // Empezar desde 1 para saltear headers
       const id = parseInt(rows[i][0]);
@@ -161,6 +160,6 @@ async function getNextId() {
     return maxId + 1;
   } catch (error) {
     console.error('Error obteniendo siguiente ID:', error);
-    return Date.now(); // Fallback: usar timestamp
+    return Date.now(); // Fallback
   }
 }

@@ -732,11 +732,13 @@
     let selectedTime = null;
     let currentMonth = new Date();
     let availabilityData = {};
+    let serverToday = null; // <-- CORRECCIÓN TIMEZONE: Fecha "hoy" según el servidor
 
     // Inicialización
     document.addEventListener('DOMContentLoaded', function() {
       initializePeopleSelector();
-      loadCalendar();
+      // CORRECCIÓN: No cargar el calendario aquí, se carga al ir al paso 2
+      // loadCalendar(); 
     });
 
     // Inicializar selector de personas
@@ -744,16 +746,10 @@
       const peopleButtons = document.querySelectorAll('.people-btn');
       peopleButtons.forEach(btn => {
         btn.addEventListener('click', function() {
-          // Remover selección anterior
           peopleButtons.forEach(b => b.classList.remove('selected'));
-          
-          // Seleccionar actual
           this.classList.add('selected');
           selectedPeople = parseInt(this.dataset.people);
-          
-          // Limpiar error
           hideError('personasError');
-          
           console.log('Personas seleccionadas:', selectedPeople);
         });
       });
@@ -764,7 +760,8 @@
       if (validateCurrentStep()) {
         if (currentStep === 1) {
           updateSummary();
-          loadCalendar();
+          // CORRECCIÓN: Cargar el calendario solo al entrar al paso 2
+          loadCalendar(); 
         } else if (currentStep === 2) {
           loadTimeSlots();
         }
@@ -784,6 +781,7 @@
     }
 
     // Validar paso actual
+    // ... (Funciones validateStep1, validateStep2, validateStep3 sin cambios) ...
     function validateCurrentStep() {
       switch(currentStep) {
         case 1:
@@ -853,7 +851,9 @@
       return true;
     }
 
+
     // Mostrar/ocultar errores
+    // ... (Funciones showError, hideError sin cambios) ...
     function showError(elementId, message) {
       const errorElement = document.getElementById(elementId);
       errorElement.textContent = message;
@@ -865,7 +865,9 @@
       errorElement.style.display = 'none';
     }
 
+
     // Actualizar display de pasos
+    // ... (Función updateStepDisplay sin cambios) ...
     function updateStepDisplay() {
       // Ocultar todos los pasos
       document.querySelectorAll('.step-content').forEach(step => {
@@ -888,187 +890,171 @@
       }
     }
 
+
     // Actualizar barra de progreso
+    // ... (Función updateProgressBar sin cambios) ...
     function updateProgressBar() {
       const progressBar = document.getElementById('progressBar');
       const progress = (currentStep / 3) * 100;
       progressBar.style.width = `${progress}%`;
     }
 
+
     // Cargar calendario
     async function loadCalendar() {
+      // CORRECCIÓN: Mostrar estado de carga y ocultar error
+      document.getElementById('calendarLoading').style.display = 'block';
+      document.getElementById('calendarError').style.display = 'none';
+      document.getElementById('dateGrid').style.display = 'none';
+      document.getElementById('monthNavigation').style.display = 'none';
+      document.getElementById('availabilityInfo').style.display = 'none';
+      
       try {
         console.log('Cargando calendario...');
         
         const response = await fetch('/api/disponibilidad');
         if (!response.ok) {
-          const errorText = await response.text();
+          const errorText = await response.json();
           console.error('Error response:', errorText);
-          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+          throw new Error(errorText.details || `HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
         console.log('Datos recibidos:', data);
         availabilityData = data;
+        serverToday = data.serverToday; // <-- CORRECCIÓN TIMEZONE: Guardar fecha del servidor
+
+        // Ocultar carga y mostrar calendario
+        document.getElementById('calendarLoading').style.display = 'none';
+        document.getElementById('dateGrid').style.display = 'grid'; // 'grid' en lugar de 'block'
+        document.getElementById('monthNavigation').style.display = 'flex'; // 'flex' en lugar de 'block'
+        document.getElementById('availabilityInfo').style.display = 'flex';
         
         renderCalendar();
       } catch (error) {
         console.error('Error cargando disponibilidad:', error);
         
-        // Fallback: crear datos básicos para mostrar el calendario
-        const today = new Date();
-        const fallbackData = {
-          month: today.getMonth() + 1,
-          year: today.getFullYear(),
-          availability: {},
-          restaurantConfig: {
-            openingHours: {
-              0: null,
-              1: { start: '12:00', end: '23:00' },
-              2: { start: '12:00', end: '23:00' },
-              3: { start: '12:00', end: '23:00' },
-              4: { start: '12:00', end: '23:00' },
-              5: { start: '12:00', end: '23:30' },
-              6: { start: '12:00', end: '23:30' }
-            },
-            maxCapacity: 50
-          }
-        };
-        
-        // Crear disponibilidad básica para los próximos 30 días
-        for (let i = 0; i < 30; i++) {
-          const date = new Date(today);
-          date.setDate(today.getDate() + i);
-          const dateString = date.toISOString().split('T')[0];
-          const dayOfWeek = date.getDay();
-          
-          fallbackData.availability[dateString] = {
-            available: dayOfWeek !== 0, // No disponible los domingos
-            reason: dayOfWeek === 0 ? 'Restaurante cerrado' : null,
-            slotsCount: dayOfWeek !== 0 ? 8 : 0,
-            dayOfWeek: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dayOfWeek]
-          };
-        }
-        
-        availabilityData = fallbackData;
-        renderCalendar();
-        
-        // Mostrar mensaje de advertencia
-        console.warn('Usando datos de fallback debido a error en la API');
-        const messageDiv = document.createElement('div');
-        messageDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px;';
-        messageDiv.textContent = 'Aviso: Problemas de conexión. Los horarios mostrados son aproximados.';
-        document.querySelector('.form-container').prepend(messageDiv);
+        // CORRECCIÓN: Mostrar error al usuario en lugar de datos falsos
+        document.getElementById('calendarLoading').style.display = 'none';
+        document.getElementById('calendarError').style.display = 'block';
+        document.getElementById('calendarError').querySelector('p').textContent = error.message;
       }
     }
 
     // Renderizar calendario
     function renderCalendar() {
-  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  
-  document.getElementById('monthTitle').textContent = 
-    `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
+      const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+      
+      document.getElementById('monthTitle').textContent = 
+        `${monthNames[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
 
-  const dateGrid = document.getElementById('dateGrid');
-  
-  // Limpiar grid (mantener headers)
-  const headers = dateGrid.querySelectorAll('.date-header');
-  dateGrid.innerHTML = '';
-  headers.forEach(header => dateGrid.appendChild(header));
+      const dateGrid = document.getElementById('dateGrid');
+      
+      const headers = dateGrid.querySelectorAll('.date-header');
+      dateGrid.innerHTML = '';
+      headers.forEach(header => dateGrid.appendChild(header));
 
-  // Calcular primer y último día del mes
-  const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-  const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-  
-  // CORRECCIÓN CRÍTICA:
-  // getDay() devuelve: 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
-  // Nuestro grid HTML tiene headers: Lun, Mar, Mié, Jue, Vie, Sáb, Dom
-  // Necesitamos convertir para que Lun=0, Mar=1... Dom=6
-  let startDay = firstDay.getDay();
-  startDay = (startDay === 0) ? 6 : startDay - 1;
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+      const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const lastDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      
+      let startDay = firstDay.getDay();
+      startDay = (startDay === 0) ? 6 : startDay - 1;
+      
+      // --- INICIO CORRECCIÓN TIMEZONE ---
+      // "Hoy" según el navegador del cliente (para el resaltado visual)
+      const localToday = new Date();
+      localToday.setHours(0, 0, 0, 0);
 
-  // Espacios vacíos al inicio
-  for (let i = 0; i < startDay; i++) {
-    const emptyDiv = document.createElement('div');
-    dateGrid.appendChild(emptyDiv);
-  }
+      // Fecha mínima para reservar (basada en la hora del servidor UTC)
+      // Se añade 'Z' para asegurar que se interpreta como UTC
+      const serverMinDate = new Date(serverToday + 'T00:00:00Z'); 
+      // --- FIN CORRECCIÓN TIMEZONE ---
 
-  // Días del mes
-  for (let day = 1; day <= lastDay.getDate(); day++) {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    const dateString = date.toISOString().split('T')[0];
-    
-    const dateBtn = document.createElement('div');
-    dateBtn.className = 'date-btn';
-    dateBtn.textContent = day;
-    
-    // Determinar estado del día
-    if (date < today) {
-      dateBtn.classList.add('disabled');
-    } else if (date.toDateString() === today.toDateString()) {
-      dateBtn.classList.add('today');
-    }
+      // Espacios vacíos al inicio
+      for (let i = 0; i < startDay; i++) {
+        const emptyDiv = document.createElement('div');
+        dateGrid.appendChild(emptyDiv);
+      }
 
-    // Verificar disponibilidad
-    const availability = availabilityData.availability && availabilityData.availability[dateString];
-    if (availability) {
-      if (availability.available) {
-        dateBtn.classList.add('available');
-      } else {
-        dateBtn.classList.add('unavailable');
+      // Días del mes
+      for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+        const dateString = date.toISOString().split('T')[0];
+        
+        const dateBtn = document.createElement('div');
+        dateBtn.className = 'date-btn';
+        dateBtn.textContent = day;
+        
+        // Determinar estado del día
+        // CORRECCIÓN TIMEZONE: Deshabilitar días ANTERIORES al "hoy" del servidor
+        if (date < serverMinDate) {
+          dateBtn.classList.add('disabled');
+        } else if (date.toDateString() === localToday.toDateString()) {
+          // CORRECCIÓN TIMEZONE: Marcar "hoy" según el navegador local
+          dateBtn.classList.add('today');
+        }
+
+        // Verificar disponibilidad
+        const availability = availabilityData.availability && availabilityData.availability[dateString];
+        if (availability) {
+          if (availability.available) {
+            dateBtn.classList.add('available');
+          } else {
+            // No añadir 'unavailable' si ya está 'disabled' por ser fecha pasada
+            if (!dateBtn.classList.contains('disabled')) {
+              dateBtn.classList.add('unavailable');
+            }
+          }
+        } else if (!dateBtn.classList.contains('disabled')) {
+            // Si no hay datos de disponibilidad y no es un día pasado, marcar como no disponible
+            dateBtn.classList.add('unavailable');
+        }
+
+        // Event listener para selección
+        if (!dateBtn.classList.contains('disabled') && !dateBtn.classList.contains('unavailable')) {
+          dateBtn.addEventListener('click', function() {
+            document.querySelectorAll('.date-btn').forEach(btn => {
+              btn.classList.remove('selected');
+            });
+            
+            this.classList.add('selected');
+            selectedDate = dateString;
+            
+            document.getElementById('dateNextBtn').disabled = false;
+            hideError('fechaError');
+            
+            console.log('✅ Fecha seleccionada:', selectedDate);
+          });
+        }
+        
+        // Repintar selección si existe
+        if (selectedDate === dateString) {
+          dateBtn.classList.add('selected');
+        }
+
+        dateGrid.appendChild(dateBtn);
       }
     }
 
-    // Event listener para selección
-    if (!dateBtn.classList.contains('disabled') && !dateBtn.classList.contains('unavailable')) {
-      dateBtn.addEventListener('click', function() {
-        // Remover selección anterior
-        document.querySelectorAll('.date-btn').forEach(btn => {
-          btn.classList.remove('selected');
-        });
-        
-        // Seleccionar actual
-        this.classList.add('selected');
-        selectedDate = dateString;
-        
-        // Habilitar botón siguiente
-        document.getElementById('dateNextBtn').disabled = false;
-        hideError('fechaError');
-        
-        // LOG para verificar que la fecha es correcta
-        console.log('✅ Fecha seleccionada:', selectedDate);
-        console.log('📅 Día completo:', date.toLocaleDateString('es-ES', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        }));
-      });
-    }
-
-    dateGrid.appendChild(dateBtn);
-  }
-}
 
     // Navegación de meses
     function previousMonth() {
       const newMonth = new Date(currentMonth);
       newMonth.setMonth(currentMonth.getMonth() - 1);
       
-      // No permitir meses anteriores al actual
-      const today = new Date();
-      if (newMonth.getFullYear() > today.getFullYear() || 
-          (newMonth.getFullYear() === today.getFullYear() && newMonth.getMonth() >= today.getMonth())) {
+      // No permitir meses anteriores al actual (según el servidor)
+      const serverMinDate = new Date(serverToday + 'T00:00:00Z');
+      
+      if (newMonth.getFullYear() > serverMinDate.getFullYear() || 
+          (newMonth.getFullYear() === serverMinDate.getFullYear() && newMonth.getMonth() >= serverMinDate.getMonth())) {
         currentMonth = newMonth;
         renderCalendar();
       }
     }
 
     function nextMonth() {
+      // ... (Función nextMonth sin cambios) ...
       const newMonth = new Date(currentMonth);
       newMonth.setMonth(currentMonth.getMonth() + 1);
       
@@ -1084,72 +1070,46 @@
 
     // Cargar horarios disponibles
     async function loadTimeSlots() {
+      // CORRECCIÓN: Mostrar estado de carga y ocultar error
+      document.getElementById('timeLoading').style.display = 'block';
+      document.getElementById('timeError').style.display = 'none';
+      document.getElementById('timeGrid').style.display = 'none';
+
       try {
         console.log(`Cargando horarios para ${selectedDate} con ${selectedPeople} personas`);
         
         const response = await fetch(`/api/disponibilidad?fecha=${selectedDate}&personas=${selectedPeople}`);
         if (!response.ok) {
-          const errorText = await response.text();
+          const errorText = await response.json();
           console.error('Error response:', errorText);
-          throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+          throw new Error(errorText.details || `HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
         console.log('Datos de horarios recibidos:', data);
+        
+        // Ocultar carga y mostrar horarios
+        document.getElementById('timeLoading').style.display = 'none';
+        document.getElementById('timeGrid').style.display = 'grid'; // 'grid' en lugar de 'block'
         renderTimeSlots(data);
         
-        // Actualizar información de fecha seleccionada
         const dateObj = new Date(selectedDate + 'T00:00:00');
-        const options = { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        };
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         document.getElementById('selectedDateDisplay').textContent = 
           dateObj.toLocaleDateString('es-ES', options);
         
       } catch (error) {
         console.error('Error cargando horarios:', error);
         
-        // Fallback: mostrar horarios básicos
-        const fallbackData = {
-          fecha: selectedDate,
-          available: true,
-          availableSlots: [
-            { time: '12:00', availableSpaces: 50, reservationsCount: 0 },
-            { time: '12:30', availableSpaces: 50, reservationsCount: 0 },
-            { time: '13:00', availableSpaces: 50, reservationsCount: 0 },
-            { time: '19:00', availableSpaces: 50, reservationsCount: 0 },
-            { time: '19:30', availableSpaces: 50, reservationsCount: 0 },
-            { time: '20:00', availableSpaces: 50, reservationsCount: 0 },
-            { time: '20:30', availableSpaces: 50, reservationsCount: 0 },
-            { time: '21:00', availableSpaces: 50, reservationsCount: 0 }
-          ]
-        };
-        
-        renderTimeSlots(fallbackData);
-        
-        // Actualizar información de fecha seleccionada
-        const dateObj = new Date(selectedDate + 'T00:00:00');
-        const options = { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        };
-        document.getElementById('selectedDateDisplay').textContent = 
-          dateObj.toLocaleDateString('es-ES', options);
-        
-        // Mostrar advertencia
-        const warningDiv = document.createElement('div');
-        warningDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 14px;';
-        warningDiv.textContent = 'Aviso: Problemas de conexión. Los horarios mostrados son aproximados.';
-        document.getElementById('step3').prepend(warningDiv);
+        // CORRECCIÓN: Mostrar error al usuario en lugar de datos falsos
+        document.getElementById('timeLoading').style.display = 'none';
+        document.getElementById('timeError').style.display = 'block';
+        document.getElementById('timeError').querySelector('p').textContent = error.message;
       }
     }
 
     // Renderizar horarios
+    // ... (Función renderTimeSlots sin cambios) ...
     function renderTimeSlots(availability) {
       const timeGrid = document.getElementById('timeGrid');
       timeGrid.innerHTML = '';
@@ -1168,20 +1128,16 @@
         `;
 
         timeBtn.addEventListener('click', function() {
-          // Remover selección anterior
           document.querySelectorAll('.time-btn').forEach(btn => {
             btn.classList.remove('selected');
           });
           
-          // Seleccionar actual
           this.classList.add('selected');
           selectedTime = slot.time;
           
-          // Habilitar botón enviar
           document.getElementById('submitBtn').disabled = false;
           hideError('horaError');
           
-          // Actualizar resumen
           updateSummary();
           
           console.log('Hora seleccionada:', selectedTime);
@@ -1191,7 +1147,9 @@
       });
     }
 
+
     // Actualizar resumen
+    // ... (Función updateSummary sin cambios) ...
     function updateSummary() {
       document.getElementById('summaryName').textContent = document.getElementById('nombre').value;
       document.getElementById('summaryEmail').textContent = document.getElementById('email').value;
@@ -1212,7 +1170,9 @@
       document.getElementById('summaryTime').textContent = selectedTime || '-';
     }
 
+
     // Enviar reserva
+    // ... (Función submitReservation sin cambios) ...
     async function submitReservation() {
       try {
         // Mostrar loading
@@ -1264,6 +1224,7 @@
     }
 
     // Formatear fecha para display
+    // ... (Función formatDate sin cambios) ...
     function formatDate(dateString) {
       const date = new Date(dateString + 'T00:00:00');
       const options = { 

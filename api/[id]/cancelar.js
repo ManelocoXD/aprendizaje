@@ -19,6 +19,44 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: 'v4', auth });
 
+// --- INICIO FUNCIÓN HELPER (NUEVA) ---
+// Variable para cachear el ID de la hoja y no pedirlo en cada borrado
+let memoizedSheetId = null;
+
+/**
+ * Obtiene el ID numérico de una hoja (pestaña) a partir de su nombre.
+ * Esto es necesario para la API de batchUpdate (borrado).
+ */
+async function getSheetId(spreadsheetId, sheetName) {
+  if (memoizedSheetId) return memoizedSheetId;
+
+  try {
+    console.log(`Buscando sheetId para la hoja: "${sheetName}"`);
+    const response = await sheets.spreadsheets.get({
+      spreadsheetId: spreadsheetId,
+      ranges: [sheetName], // Solo pedimos metadatos de esta hoja
+    });
+
+    const sheet = response.data.sheets.find(
+      (s) => s.properties.title === sheetName
+    );
+
+    if (!sheet) {
+      throw new Error(`Hoja de cálculo con nombre "${sheetName}" no encontrada.`);
+    }
+    
+    memoizedSheetId = sheet.properties.sheetId;
+    console.log(`SheetId encontrado: ${memoizedSheetId}`);
+    return memoizedSheetId;
+
+  } catch (error) {
+    console.error('Error obteniendo sheetId:', error);
+    throw error;
+  }
+}
+// --- FIN FUNCIÓN HELPER ---
+
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
@@ -26,6 +64,16 @@ module.exports = async (req, res) => {
   
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== "DELETE") return res.status(405).json({ error: "Método no permitido" });
+
+  // CORRECCIÓN: Validar que el nombre de la hoja esté configurado
+  const sheetName = process.env.GOOGLE_SHEET_NAME;
+  if (!process.env.GOOGLE_SHEET_ID || !sheetName) {
+    console.error('Error: GOOGLE_SHEET_ID o GOOGLE_SHEET_NAME no están configurados.');
+    return res.status(500).json({ 
+      error: "Error de configuración del servidor",
+      details: "Faltan variables de entorno para Google Sheets."
+    });
+  }
 
   const id = req.query.id;
   if (!id) return res.status(400).json({ error: "Falta el ID de la reserva" });
@@ -43,12 +91,9 @@ module.exports = async (req, res) => {
     console.log('Reserva encontrada para cancelar:', {
       id: reserva.id,
       nombre: reserva.nombre,
-      fecha: reserva.fecha,
-      hora: reserva.hora,
-      personas: reserva.personas
+      rowIndex: reserva.rowIndex
     });
 
-    // Verificar que la reserva esté confirmada
     if (reserva.estado !== 'confirmada') {
       return res.status(400).json({ 
         error: "Solo se pueden cancelar reservas confirmadas",
@@ -66,10 +111,7 @@ module.exports = async (req, res) => {
       message: "Reserva cancelada exitosamente",
       reserva_cancelada: {
         id: reserva.id,
-        nombre: reserva.nombre,
-        fecha: reserva.fecha,
-        hora: reserva.hora,
-        personas: reserva.personas
+        nombre: reserva.nombre
       }
     });
     
@@ -86,9 +128,11 @@ async function findReservaById(id) {
   try {
     console.log('Buscando reserva con ID:', id);
     
+    // CORRECCIÓN: Usar nombre de la hoja
+    const sheetName = process.env.GOOGLE_SHEET_NAME;
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: 'A:I',
+      range: `'${sheetName}'!A:I`,
     });
 
     const rows = response.data.values || [];
@@ -104,13 +148,7 @@ async function findReservaById(id) {
         const reserva = {
           id: rows[i][0],
           nombre: rows[i][1],
-          telefono: rows[i][2],
-          email: rows[i][3],
-          personas: parseInt(rows[i][4]) || 0,
-          fecha: rows[i][5],
-          hora: rows[i][6],
           estado: rows[i][7],
-          created_at: rows[i][8],
           rowIndex: i + 1 // +1 porque sheets empieza en 1
         };
         
@@ -132,6 +170,14 @@ async function deleteReserva(rowIndex) {
   try {
     console.log('Eliminando fila:', rowIndex);
     
+    // --- INICIO CORRECCIÓN 'sheetId: 0' ---
+    // Obtenemos el ID numérico de la hoja a partir de su nombre
+    const sheetId = await getSheetId(
+      process.env.GOOGLE_SHEET_ID, 
+      process.env.GOOGLE_SHEET_NAME
+    );
+    // --- FIN CORRECCIÓN ---
+
     // Eliminar la fila completa usando batchUpdate
     const response = await sheets.spreadsheets.batchUpdate({
       spreadsheetId: process.env.GOOGLE_SHEET_ID,
@@ -140,7 +186,7 @@ async function deleteReserva(rowIndex) {
           {
             deleteDimension: {
               range: {
-                sheetId: 0, // ID de la primera hoja (por defecto es 0)
+                sheetId: sheetId, // <-- Usamos el ID numérico correcto
                 dimension: 'ROWS',
                 startIndex: rowIndex - 1, // -1 porque la API usa índice base 0
                 endIndex: rowIndex
